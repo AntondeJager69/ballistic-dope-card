@@ -1,0 +1,122 @@
+<div class="space-y-4 text-xs">
+  <div class="bg-slate-800 rounded-xl p-3 shadow">
+    <h2 class="text-sm font-semibold mb-2">Venues & sub-ranges</h2>
+
+    <div *ngIf="venues.length === 0" class="text-slate-400">
+      No venues yet. Add one below.
+    </div>
+
+    <div class="space-y-2">
+      <div *ngFor="let v of venues" class="bg-slate-900 rounded-lg p-2">
+        <div class="flex justify-between items-start">
+          <div>
+            <div class="font-semibold">{{ v.name }}</div>
+            <div class="text-slate-300" *ngIf="v.location">
+              {{ v.location }}
+            </div>
+            <div class="text-slate-400" *ngIf="v.altitudeM">
+              Altitude: {{ v.altitudeM }} m
+            </div>
+          </div>
+          <div class="flex flex-col gap-1">
+            <button class="px-2 py-1 text-[10px] rounded bg-emerald-700"
+                    (click)="edit(v)">Edit</button>
+            <button class="px-2 py-1 text-[10px] rounded bg-red-700"
+                    (click)="delete(v)">Delete</button>
+          </div>
+        </div>
+
+        <div class="mt-2">
+          <div class="font-semibold text-[11px]">Sub-ranges</div>
+          <div *ngIf="v.subRanges.length === 0" class="text-slate-400">
+            None defined.
+          </div>
+          <ul class="flex flex-wrap gap-2 mt-1">
+            <li *ngFor="let sr of v.subRanges"
+                class="px-2 py-1 rounded bg-slate-800">
+              {{ sr.distanceM }} m
+              <span *ngIf="sr.firingPointName">• {{ sr.firingPointName }}</span>
+              <span *ngIf="sr.targetType">• {{ sr.targetType }}</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form -->
+  <div class="bg-slate-800 rounded-xl p-3 shadow space-y-2">
+    <h2 class="text-sm font-semibold">
+      {{ editing ? 'Edit venue' : 'Add venue' }}
+    </h2>
+
+    <div class="grid grid-cols-2 gap-2">
+      <label class="flex flex-col">
+        Name
+        <input [(ngModel)]="form.name" name="name"
+               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Location
+        <input [(ngModel)]="form.location" name="location"
+               placeholder="Town, country"
+               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Altitude (m)
+        <input type="number" [(ngModel)]="form.altitudeM" name="altitude"
+               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+    </div>
+
+    <label class="flex flex-col">
+      Notes
+      <textarea [(ngModel)]="form.notes" name="notes" rows="2"
+                class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700"></textarea>
+    </label>
+
+    <!-- Sub-range editor -->
+    <div class="mt-2 space-y-2">
+      <div class="flex items-end gap-2">
+        <label class="flex-1 flex flex-col">
+          Distance (m)
+          <input type="number"
+                 [(ngModel)]="subRangeDistance"
+                 name="subRangeDistance"
+                 class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+        </label>
+        <button class="px-3 py-1 rounded bg-sky-700 text-xs"
+                (click)="addSubRange()">
+          Add sub-range
+        </button>
+      </div>
+
+      <div *ngIf="form.subRanges?.length">
+        <div class="font-semibold text-[11px] mb-1">Current sub-ranges</div>
+        <ul class="space-y-1">
+          <li *ngFor="let sr of form.subRanges"
+              class="flex justify-between items-center bg-slate-900 rounded px-2 py-1">
+            <span>{{ sr.distanceM }} m</span>
+            <button class="px-2 py-0.5 text-[10px] rounded bg-red-700"
+                    (click)="removeSubRange(sr)">
+              Remove
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-2 pt-2">
+      <button class="px-3 py-1 text-xs rounded bg-slate-700"
+              (click)="resetForm()">
+        Clear
+      </button>
+      <button class="px-3 py-1 text-xs rounded bg-emerald-600"
+              (click)="save()">
+        {{ editing ? 'Update' : 'Save' }}
+      </button>
+    </div>
+  </div>
+</div>

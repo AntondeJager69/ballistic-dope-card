@@ -1,0 +1,126 @@
+<div class="space-y-4">
+  <!-- List -->
+  <div class="bg-slate-800 rounded-xl p-3 shadow">
+    <h2 class="text-sm font-semibold mb-2">Rifles</h2>
+
+    <div *ngIf="rifles.length === 0" class="text-xs text-slate-400">
+      No rifles yet. Add one below.
+    </div>
+
+    <ul class="space-y-2">
+      <li *ngFor="let rifle of rifles" class="flex justify-between items-start text-xs bg-slate-900 rounded-lg p-2">
+        <div>
+          <div class="font-semibold">{{ rifle.name }}</div>
+          <div class="text-slate-300">{{ rifle.caliber }}</div>
+          <div class="text-slate-400" *ngIf="rifle.scopeModel">
+            Scope: {{ rifle.scopeModel }} ({{ rifle.scopeClickUnit }} {{ rifle.scopeClickValue || '' }} / click)
+          </div>
+        </div>
+        <div class="flex flex-col gap-1 ml-2">
+          <button class="px-2 py-1 text-[10px] rounded bg-emerald-700"
+                  (click)="edit(rifle)">
+            Edit
+          </button>
+          <button class="px-2 py-1 text-[10px] rounded bg-red-700"
+                  (click)="delete(rifle)">
+            Delete
+          </button>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- Form -->
+  <div class="bg-slate-800 rounded-xl p-3 shadow space-y-2">
+    <h2 class="text-sm font-semibold">
+      {{ editing ? 'Edit rifle' : 'Add rifle' }}
+    </h2>
+
+    <div class="grid grid-cols-2 gap-2 text-xs">
+      <label class="flex flex-col">
+        Name
+        <input [(ngModel)]="form.name" name="name"
+               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Caliber
+        <input [(ngModel)]="form.caliber" name="caliber"
+               placeholder="e.g. 6.5 Creedmoor"
+               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Barrel length (cm)
+        <input type="number" [(ngModel)]="form.barrelLengthCm" name="barrelLength"
+               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Twist rate
+        <input [(ngModel)]="form.twistRate" name="twistRate"
+               placeholder="e.g. 1:8"
+               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Bullet weight (gr)
+        <input type="number" [(ngModel)]="form.bulletWeightGr" name="bulletWeight"
+               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Muzzle velocity (m/s)
+        <input type="number" [(ngModel)]="form.muzzleVelocityMs" name="muzzleVelocity"
+               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Zero range (m)
+        <input type="number" [(ngModel)]="form.zeroRangeM" name="zeroRange"
+               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Scope model
+        <input [(ngModel)]="form.scopeModel" name="scopeModel"
+               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Click unit
+        <select [(ngModel)]="form.scopeClickUnit" name="scopeClickUnit"
+                class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700">
+          <option *ngFor="let unit of clickUnits" [ngValue]="unit">
+            {{ unit }}
+          </option>
+        </select>
+      </label>
+
+      <label class="flex flex-col">
+        Click value
+        <input type="number" step="0.01" [(ngModel)]="form.scopeClickValue" name="scopeClickValue"
+               placeholder="0.1 MIL or 0.25 MOA"
+               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+    </div>
+
+    <label class="flex flex-col text-xs">
+      Notes
+      <textarea [(ngModel)]="form.notes" name="notes"
+                rows="2"
+                class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700"></textarea>
+    </label>
+
+    <div class="flex justify-end gap-2 pt-2">
+      <button class="px-3 py-1 text-xs rounded bg-slate-700"
+              (click)="resetForm()">
+        Clear
+      </button>
+      <button class="px-3 py-1 text-xs rounded bg-emerald-600"
+              (click)="save()">
+        {{ editing ? 'Update' : 'Save' }}
+      </button>
+    </div>
+  </div>
+</div>

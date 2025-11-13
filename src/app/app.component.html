@@ -1,0 +1,23 @@
+<div class="p-4 text-white min-h-screen bg-slate-900 flex flex-col">
+
+  <h1 class="text-2xl font-bold mb-4 text-center">
+    Ballistic Dope Card
+  </h1>
+
+  <!-- TAB CONTENT -->
+  <div class="flex-grow">
+    <app-rifles-tab *ngIf="activeTab === 'rifles'"></app-rifles-tab>
+    <app-venues-tab *ngIf="activeTab === 'venues'"></app-venues-tab>
+    <app-session-tab *ngIf="activeTab === 'session'"></app-session-tab>
+    <app-history-tab *ngIf="activeTab === 'history'"></app-history-tab>
+  </div>
+
+  <!-- TAB BAR -->
+  <div class="flex justify-around bg-slate-800 text-white py-3 rounded-xl mt-4">
+    <button class="flex-1 text-center" (click)="setTab('rifles')">Rifles</button>
+    <button class="flex-1 text-center" (click)="setTab('venues')">Venues</button>
+    <button class="flex-1 text-center" (click)="setTab('session')">Session</button>
+    <button class="flex-1 text-center" (click)="setTab('history')">History</button>
+  </div>
+
+</div>

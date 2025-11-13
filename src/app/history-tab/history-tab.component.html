@@ -1,0 +1,89 @@
+<div class="space-y-3 text-xs">
+  <div class="bg-slate-800 rounded-xl p-3 shadow">
+    <h2 class="text-sm font-semibold mb-2">History</h2>
+
+    <div *ngIf="sessions.length === 0" class="text-slate-400">
+      No sessions saved yet. After you record dope, save it from the Session tab.
+    </div>
+
+    <div class="space-y-2">
+      <div *ngFor="let s of sessions"
+           class="bg-slate-900 rounded-lg p-2">
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="font-semibold">
+              {{ s.title || 'Session' }} • {{ formatDate(s.date) }}
+            </div>
+            <div class="text-slate-400 text-[11px]">
+              Rifle #{{ s.rifleId }} • Venue #{{ s.venueId }}
+            </div>
+          </div>
+          <div class="flex gap-1">
+            <button class="px-2 py-1 text-[10px] rounded bg-slate-700"
+                    (click)="toggle(s)">
+              {{ expandedId === s.id ? 'Hide' : 'View' }}
+            </button>
+            <button class="px-2 py-1 text-[10px] rounded bg-red-700"
+                    (click)="delete(s)">
+              Delete
+            </button>
+          </div>
+        </div>
+
+        <div *ngIf="expandedId === s.id" class="mt-2 space-y-2">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <div class="font-semibold text-[11px]">Environment</div>
+              <ul class="text-slate-300 text-[11px] space-y-0.5">
+                <li *ngIf="s.environment.temperatureC !== undefined">
+                  Temp: {{ s.environment.temperatureC }} °C
+                </li>
+                <li *ngIf="s.environment.pressureHpa !== undefined">
+                  Pressure: {{ s.environment.pressureHpa }} hPa
+                </li>
+                <li *ngIf="s.environment.humidityPercent !== undefined">
+                  Humidity: {{ s.environment.humidityPercent }} %
+                </li>
+                <li *ngIf="s.environment.densityAltitudeM !== undefined">
+                  DA: {{ s.environment.densityAltitudeM }} m
+                </li>
+                <li *ngIf="s.environment.windSpeedMps !== undefined">
+                  Wind: {{ s.environment.windSpeedMps }} m/s @ {{ s.environment.windDirectionDeg || '?' }}°
+                </li>
+                <li *ngIf="s.environment.lightConditions">
+                  Light: {{ s.environment.lightConditions }}
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div>
+            <div class="font-semibold text-[11px] mb-1">Dope</div>
+            <div class="space-y-1">
+              <div *ngFor="let d of s.dope"
+                   class="bg-slate-950 rounded px-2 py-1">
+                <div class="font-semibold text-[11px]">
+                  {{ d.distanceM }} m
+                </div>
+                <div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-300">
+                  <span *ngIf="d.elevationClicks !== undefined">Elev: {{ d.elevationClicks }} clicks</span>
+                  <span *ngIf="d.windageClicks !== undefined">Wind: {{ d.windageClicks }} clicks</span>
+                  <span *ngIf="d.elevationMil !== undefined">Elev: {{ d.elevationMil }} mil</span>
+                  <span *ngIf="d.windageMil !== undefined">Wind: {{ d.windageMil }} mil</span>
+                  <span *ngIf="d.groupSizeMoA !== undefined">Group: {{ d.groupSizeMoA }} MOA</span>
+                </div>
+                <div *ngIf="d.impactsDescription" class="text-slate-400 text-[11px] mt-1">
+                  {{ d.impactsDescription }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="s.notes" class="text-slate-300 text-[11px]">
+            <span class="font-semibold">Notes:</span> {{ s.notes }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

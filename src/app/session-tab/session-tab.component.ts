@@ -97,10 +97,11 @@ export class SessionTabComponent implements OnInit {
       if (Array.isArray(sr.distancesM)) {
         distances = sr.distancesM;
       } else if (typeof sr.distanceM === 'number') {
+        // backward compatibility with older shape
         distances = [sr.distanceM];
       }
 
-      distances.forEach((d) => {
+      distances.forEach((d: number) => {
         rows.push({
           subRangeId: sr.id,
           distanceM: d

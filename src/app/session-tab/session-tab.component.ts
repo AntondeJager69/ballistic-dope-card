@@ -12,6 +12,12 @@ import {
   Session
 } from '../models';
 
+interface WizardSubRange {
+  id: number;
+  name: string;
+  distancesText: string;
+}
+
 @Component({
   selector: 'app-session-tab',
   standalone: true,
@@ -48,7 +54,7 @@ export class SessionTabComponent implements OnInit {
     altitudeM: undefined,
     notes: ''
   };
-  venueWizardSubRanges: SubRange[] = [];
+  venueWizardSubRanges: WizardSubRange[] = [];
 
   constructor(private data: DataService) {}
 
@@ -67,7 +73,16 @@ export class SessionTabComponent implements OnInit {
     }
   }
 
-  // ----- Venue selection & dope rows -----
+  // ---------- Utilities ----------
+
+  private parseDistances(text: string): number[] {
+    return (text || '')
+      .split(/[;,]/)
+      .map((t) => parseFloat(t.trim()))
+      .filter((n) => !isNaN(n) && n > 0);
+  }
+
+  // ---------- Venue selection & dope rows ----------
 
   onVenueChange() {
     const venue = this.data.getVenueById(this.selectedVenueId);
@@ -76,13 +91,27 @@ export class SessionTabComponent implements OnInit {
       return;
     }
 
-    this.dopeRows = venue.subRanges.map(sr => ({
-      subRangeId: sr.id,
-      distanceM: sr.distanceM
-    }));
+    const rows: DistanceDope[] = [];
+    (venue.subRanges || []).forEach((sr: any) => {
+      let distances: number[] = [];
+      if (Array.isArray(sr.distancesM)) {
+        distances = sr.distancesM;
+      } else if (typeof sr.distanceM === 'number') {
+        distances = [sr.distanceM];
+      }
+
+      distances.forEach((d) => {
+        rows.push({
+          subRangeId: sr.id,
+          distanceM: d
+        });
+      });
+    });
+
+    this.dopeRows = rows;
   }
 
-  // ----- Rifle wizard -----
+  // ---------- Rifle wizard ----------
 
   startRifleWizard() {
     this.showRifleWizard = true;
@@ -115,7 +144,7 @@ export class SessionTabComponent implements OnInit {
     this.cancelRifleWizard();
   }
 
-  // ----- Venue wizard -----
+  // ---------- Venue wizard ----------
 
   startVenueWizard() {
     this.showVenueWizard = true;
@@ -140,12 +169,14 @@ export class SessionTabComponent implements OnInit {
     this.venueWizardSubRanges.push({
       id,
       name: '',
-      distanceM: 100
+      distancesText: ''
     });
   }
 
-  removeVenueWizardSubRange(sr: SubRange) {
-    this.venueWizardSubRanges = this.venueWizardSubRanges.filter(s => s.id !== sr.id);
+  removeVenueWizardSubRange(sr: WizardSubRange) {
+    this.venueWizardSubRanges = this.venueWizardSubRanges.filter(
+      (s) => s.id !== sr.id
+    );
   }
 
   saveVenueFromWizard() {
@@ -154,15 +185,22 @@ export class SessionTabComponent implements OnInit {
       return;
     }
 
-    const cleanedSubRanges = this.venueWizardSubRanges
-      .filter(sr => sr.distanceM && sr.distanceM > 0)
-      .map(sr => ({
-        ...sr,
-        name: sr.name?.trim() || undefined
-      }));
+    const subRanges: SubRange[] = [];
+    for (const ws of this.venueWizardSubRanges) {
+      const name = ws.name.trim();
+      const distances = this.parseDistances(ws.distancesText);
+      if (!name || distances.length === 0) {
+        continue;
+      }
+      subRanges.push({
+        id: ws.id,
+        name,
+        distancesM: distances
+      });
+    }
 
-    if (cleanedSubRanges.length === 0) {
-      alert('Add at least one sub-range with a valid distance.');
+    if (subRanges.length === 0) {
+      alert('Add at least one sub-range with valid distances.');
       return;
     }
 
@@ -171,7 +209,7 @@ export class SessionTabComponent implements OnInit {
       location: this.venueWizardForm.location,
       altitudeM: this.venueWizardForm.altitudeM,
       notes: this.venueWizardForm.notes,
-      subRanges: cleanedSubRanges
+      subRanges
     });
 
     this.venues = this.data.getVenues();
@@ -181,7 +219,7 @@ export class SessionTabComponent implements OnInit {
     this.cancelVenueWizard();
   }
 
-  // ----- Session saving -----
+  // ---------- Session saving ----------
 
   saveSession() {
     if (!this.selectedRifleId || !this.selectedVenueId) {

@@ -1,49 +1,107 @@
-  <!-- RIFLE WIZARD -->
-  <div *ngIf="showRifleWizard" class="bg-emerald-900/40 border border-emerald-500 rounded-xl p-3 shadow">
-    <h2 class="text-sm font-semibold mb-2">Add your first rifle</h2>
-    <p class="text-[11px] text-emerald-100 mb-2">
-      You need at least one rifle before recording a session. Fill in the basics now; you can refine it later in the Rifles tab.
+  <!-- VENUE WIZARD -->
+  <div *ngIf="showVenueWizard" class="bg-sky-900/40 border border-sky-500 rounded-xl p-3 shadow">
+    <h2 class="text-sm font-semibold mb-2">Add your first venue</h2>
+    <p class="text-[11px] text-sky-100 mb-2">
+      Create a venue and its sub-ranges so your dope table can be generated.
     </p>
 
-    <div class="grid grid-cols-2 gap-2">
+    <div class="grid grid-cols-2 gap-2 mb-2">
       <label class="flex flex-col">
         Name
         <input
-          [(ngModel)]="rifleWizardForm.name"
-          name="wizardRifleName"
-          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-emerald-600" />
+          [(ngModel)]="venueWizardForm.name"
+          name="wizardVenueName"
+          placeholder="Range name"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-sky-600" />
       </label>
 
       <label class="flex flex-col">
-        Caliber
+        Location (optional)
         <input
-          [(ngModel)]="rifleWizardForm.caliber"
-          name="wizardRifleCaliber"
-          placeholder="e.g. 6.5 Creedmoor"
-          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-emerald-600" />
+          [(ngModel)]="venueWizardForm.location"
+          name="wizardVenueLocation"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-sky-600" />
       </label>
 
       <label class="flex flex-col">
-        Scope unit
-        <select
-          [(ngModel)]="rifleWizardForm.scopeClickUnit"
-          name="wizardScopeUnit"
-          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-emerald-600">
-          <option *ngFor="let u of clickUnits" [ngValue]="u">{{ u }}</option>
-        </select>
+        Altitude (m)
+        <input
+          type="number"
+          [(ngModel)]="venueWizardForm.altitudeM"
+          name="wizardVenueAltitude"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-sky-600" />
       </label>
+
+      <label class="flex flex-col">
+        Notes (optional)
+        <input
+          [(ngModel)]="venueWizardForm.notes"
+          name="wizardVenueNotes"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-sky-600" />
+      </label>
+    </div>
+
+    <div class="mt-2 space-y-1">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs font-semibold">Sub-ranges</h3>
+        <button
+          class="px-2 py-1 text-[11px] rounded bg-slate-800"
+          (click)="addVenueWizardSubRange()">
+          + Add sub-range
+        </button>
+      </div>
+      <p class="text-[11px] text-sky-200">
+        Give each firing point a name and distances (comma separated, e.g. "300, 600, 800").
+      </p>
+
+      <div *ngIf="venueWizardSubRanges.length === 0" class="text-[11px] text-sky-100">
+        No sub-ranges yet. Add at least one.
+      </div>
+
+      <div
+        *ngFor="let sr of venueWizardSubRanges; let i = index"
+        class="bg-slate-900 rounded-lg p-2 mt-1 space-y-1">
+        <div class="flex justify-between items-center">
+          <span class="font-semibold text-[11px]">Sub-range #{{ i + 1 }}</span>
+          <button
+            class="text-[11px] text-red-300"
+            (click)="removeVenueWizardSubRange(sr)">
+            Remove
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <label class="flex flex-col">
+            Name
+            <input
+              [(ngModel)]="sr.name"
+              name="wizardSrName{{i}}"
+              placeholder="Warrior, Zeiss, etc."
+              class="mt-1 px-2 py-1 rounded bg-slate-950 border border-slate-700" />
+          </label>
+
+          <label class="flex flex-col">
+            Distances (m)
+            <input
+              [(ngModel)]="sr.distancesText"
+              name="wizardSrDist{{i}}"
+              placeholder="500, 578, 780"
+              class="mt-1 px-2 py-1 rounded bg-slate-950 border border-slate-700" />
+          </label>
+        </div>
+      </div>
     </div>
 
     <div class="flex justify-end gap-2 mt-3">
       <button
         class="px-3 py-1 rounded bg-slate-800 text-[11px]"
-        (click)="cancelRifleWizard()">
+        (click)="cancelVenueWizard()">
         Cancel
       </button>
       <button
-        class="px-3 py-1 rounded bg-emerald-500 text-slate-900 text-[11px] font-semibold"
-        (click)="saveRifleFromWizard()">
-        Save rifle & continue
+        class="px-3 py-1 rounded bg-sky-400 text-slate-900 text-[11px] font-semibold"
+        (click)="saveVenueFromWizard()">
+        Save venue & continue
       </button>
     </div>
   </div>

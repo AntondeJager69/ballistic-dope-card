@@ -2,48 +2,51 @@
 
 export type ScopeClickUnit = 'MIL' | 'MOA';
 
-export interface Rifle {
-  id: number;
-
-  // Basic rifle info
-  name: string;                 // e.g. "Remington"
-  caliber: string;              // e.g. "33XC"
-  barrelLengthCm?: number;      // optional – one of these
-  barrelLengthInch?: number;    // optional
-
-  twistRate?: string;           // e.g. "1:9"
-  muzzleVelocityFps?: number;   // e.g. 3025
-
-  // Optic
-  scopeModel?: string;
-  scopeClickUnit?: ScopeClickUnit; // MIL / MOA
-
-  // Bullet
-  bulletName?: string;          // e.g. "Berger Hybrid"
-  bulletWeightGr?: number;      // e.g. 300
-  bulletBcG1?: number;          // e.g. 0.471
-
-  notes?: string;
-}
+// ---------- Rifle & load data ----------
 
 export interface LoadData {
   id: number;
-  rifleId: number;          // which rifle this belongs to
-
-  powder: string;
-  powderChargeGn: number;
-  coalMm?: number;
-  coalInch?: number;
-  primer: string;
-  notes?: string;
+  powder: string;          // e.g. N570
+  powderChargeGr: number;  // grains
+  coal: string;            // COAL text, e.g. 3.456"
+  primer: string;          // e.g. "CCI 450"
 }
+
+export interface Rifle {
+  id: number;
+
+  // Identity
+  name: string;            // e.g. "Remington"
+  caliber: string;         // e.g. "33XC"
+
+  // Barrel
+  barrelLength?: number;   // numeric value
+  barrelLengthUnit?: 'cm' | 'in';
+  twistRate?: string;      // e.g. "1:9"
+
+  // Ballistics
+  muzzleVelocityFps?: number; // fps
+  scope?: string;             // scope model
+  scopeClickUnit?: ScopeClickUnit;
+
+  // Bullet
+  bulletWeightGr?: number;
+  bulletBc?: number;
+  bulletName?: string;    // e.g. "300gr Berger Hybrid"
+
+  // Notes
+  notes?: string;
+
+  // Load data entries (separate panel)
+  loads?: LoadData[];
+}
+
+// ---------- Venues & sub-ranges ----------
 
 export interface SubRange {
   id: number;
-  name?: string;           // e.g. "600 m gong", "Lane 3"
-  distanceM: number;
-  firingPointName?: string;
-  targetType?: string;
+  name: string;          // e.g. "Warrior", "Zeiss", "Lane 3"
+  distancesM: number[];  // e.g. [500, 578, 780]
 }
 
 export interface Venue {
@@ -54,6 +57,8 @@ export interface Venue {
   notes?: string;
   subRanges: SubRange[];
 }
+
+// ---------- Sessions / environment ----------
 
 export interface Environment {
   temperatureC?: number;

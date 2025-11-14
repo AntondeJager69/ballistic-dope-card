@@ -4,6 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { DataService } from '../data.service';
 import { Venue, SubRange } from '../models';
 
+interface SubRangeForm {
+  id: number | null;
+  name: string;
+  distancesText: string; // e.g. "500, 578, 780"
+}
+
 @Component({
   selector: 'app-venues-tab',
   standalone: true,
@@ -13,11 +19,24 @@ import { Venue, SubRange } from '../models';
 })
 export class VenuesTabComponent implements OnInit {
   venues: Venue[] = [];
-  editing: Venue | null = null;
 
-  form: Partial<Venue> = {
+  formVisible = false;
+  editingVenue: Venue | null = null;
+
+  expandedVenueId: number | null = null;
+
+  venueForm: Partial<Venue> = {
     name: '',
-    subRanges: []
+    location: '',
+    altitudeM: undefined,
+    notes: ''
+  };
+
+  // sub-range editor state (for the currently expanded venue)
+  subForm: SubRangeForm = {
+    id: null,
+    name: '',
+    distancesText: ''
   };
 
   constructor(private data: DataService) {}
@@ -26,109 +45,215 @@ export class VenuesTabComponent implements OnInit {
     this.refresh();
   }
 
+  // ---------- Helpers ----------
+
+  private normalizeVenue(v: Venue): Venue {
+    const subRanges: SubRange[] = (v.subRanges || []).map((s: any) => {
+      let distances: number[] = [];
+      if (Array.isArray(s.distancesM)) {
+        distances = s.distancesM;
+      } else if (typeof s.distanceM === 'number') {
+        // backward compatibility with old data
+        distances = [s.distanceM];
+      } else if (Array.isArray(s.distances)) {
+        distances = s.distances;
+      }
+
+      return {
+        id: s.id,
+        name: s.name || '',
+        distancesM: distances || []
+      };
+    });
+
+    return {
+      ...v,
+      subRanges
+    };
+  }
+
+  private parseDistances(text: string): number[] {
+    return (text || '')
+      .split(/[;,]/)
+      .map((t) => parseFloat(t.trim()))
+      .filter((n) => !isNaN(n) && n > 0);
+  }
+
+  // ---------- Venue list / form ----------
+
   refresh() {
-    this.venues = this.data.getVenues();
+    this.venues = this.data.getVenues().map((v) => this.normalizeVenue(v));
   }
 
-  // ----- Sub-ranges inside the venue form -----
-
-  addSubRangeRow() {
-    if (!this.form.subRanges) this.form.subRanges = [];
-    const id = Date.now() + Math.random();
-    const subRange: SubRange = {
-      id,
-      name: '',
-      distanceM: 100
-    };
-    this.form.subRanges.push(subRange);
+  toggleForm() {
+    this.formVisible = !this.formVisible;
+    if (this.formVisible && !this.editingVenue) {
+      this.newVenue();
+    }
   }
 
-  removeSubRangeRow(sr: SubRange) {
-    if (!this.form.subRanges) return;
-    this.form.subRanges = this.form.subRanges.filter(s => s.id !== sr.id);
-  }
-
-  // ----- Editing -----
-
-  edit(venue: Venue) {
-    this.editing = venue;
-    this.form = {
-      id: venue.id,
-      name: venue.name,
-      location: venue.location,
-      altitudeM: venue.altitudeM,
-      notes: venue.notes,
-      subRanges: venue.subRanges.map(sr => ({ ...sr }))
-    };
-  }
-
-  resetForm() {
-    this.editing = null;
-    this.form = {
+  newVenue() {
+    this.editingVenue = null;
+    this.venueForm = {
       name: '',
       location: '',
       altitudeM: undefined,
       notes: '',
       subRanges: []
     };
+    this.formVisible = true;
   }
 
-  // ----- Save / delete -----
+  editVenue(v: Venue) {
+    this.editingVenue = v;
+    this.venueForm = {
+      id: v.id,
+      name: v.name,
+      location: v.location,
+      altitudeM: v.altitudeM,
+      notes: v.notes,
+      subRanges: v.subRanges
+    };
+    this.formVisible = true;
+  }
 
-  save() {
-    if (!this.form.name) {
+  saveVenue() {
+    if (!this.venueForm.name) {
       alert('Venue name is required.');
       return;
     }
 
-    if (!this.form.subRanges || this.form.subRanges.length === 0) {
-      alert('Add at least one sub-range (distance & optional name) for this venue.');
-      return;
-    }
+    const existingSubRanges: SubRange[] =
+      (this.venueForm.subRanges as SubRange[]) || [];
 
-    const cleanedSubRanges: SubRange[] = (this.form.subRanges || [])
-      .filter(sr => sr.distanceM && sr.distanceM > 0)
-      .map(sr => ({
-        ...sr,
-        name: sr.name?.trim() || undefined
-      }));
-
-    if (cleanedSubRanges.length === 0) {
-      alert('At least one sub-range must have a valid distance.');
-      return;
-    }
-
-    if (this.editing) {
+    if (this.editingVenue) {
       const updated: Venue = {
-        id: this.editing.id,
-        name: this.form.name!,
-        location: this.form.location,
-        altitudeM: this.form.altitudeM,
-        notes: this.form.notes,
-        subRanges: cleanedSubRanges
+        id: this.editingVenue.id,
+        name: this.venueForm.name!,
+        location: this.venueForm.location,
+        altitudeM: this.venueForm.altitudeM,
+        notes: this.venueForm.notes,
+        subRanges: existingSubRanges
       };
       this.data.updateVenue(updated);
     } else {
-      this.data.addVenue({
-        name: this.form.name!,
-        location: this.form.location,
-        altitudeM: this.form.altitudeM,
-        notes: this.form.notes,
-        subRanges: cleanedSubRanges
-      });
+      const toAdd: Omit<Venue, 'id'> = {
+        name: this.venueForm.name!,
+        location: this.venueForm.location,
+        altitudeM: this.venueForm.altitudeM,
+        notes: this.venueForm.notes,
+        subRanges: existingSubRanges
+      };
+      this.data.addVenue(toAdd);
     }
 
-    this.resetForm();
+    this.formVisible = false;
+    this.editingVenue = null;
     this.refresh();
   }
 
-  delete(venue: Venue) {
-    if (confirm(`Delete venue "${venue.name}"?`)) {
-      this.data.deleteVenue(venue.id);
-      this.refresh();
-      if (this.editing?.id === venue.id) {
-        this.resetForm();
+  deleteVenue(v: Venue) {
+    if (!confirm(`Delete venue "${v.name}"?`)) return;
+    this.data.deleteVenue(v.id);
+    this.refresh();
+    if (this.expandedVenueId === v.id) {
+      this.expandedVenueId = null;
+    }
+    if (this.editingVenue?.id === v.id) {
+      this.formVisible = false;
+      this.editingVenue = null;
+    }
+  }
+
+  toggleExpanded(v: Venue) {
+    this.expandedVenueId = this.expandedVenueId === v.id ? null : v.id;
+    this.clearSubForm();
+  }
+
+  // ---------- Sub-range editing ----------
+
+  clearSubForm() {
+    this.subForm = {
+      id: null,
+      name: '',
+      distancesText: ''
+    };
+  }
+
+  startAddSubRange(v: Venue) {
+    this.expandedVenueId = v.id;
+    this.subForm = {
+      id: null,
+      name: '',
+      distancesText: ''
+    };
+  }
+
+  startEditSubRange(v: Venue, sr: SubRange) {
+    this.expandedVenueId = v.id;
+    this.subForm = {
+      id: sr.id,
+      name: sr.name,
+      distancesText: (sr.distancesM || []).join(', ')
+    };
+  }
+
+  saveSubRange(v: Venue) {
+    if (!this.subForm.name.trim()) {
+      alert('Sub-range name is required.');
+      return;
+    }
+
+    const distances = this.parseDistances(this.subForm.distancesText);
+    if (distances.length === 0) {
+      alert('Enter at least one distance (comma separated).');
+      return;
+    }
+
+    const venue = this.venues.find((x) => x.id === v.id);
+    if (!venue) return;
+
+    const subRanges = (venue.subRanges || []).map((sr) => ({ ...sr }));
+    if (this.subForm.id == null) {
+      const id = Date.now() + Math.random();
+      subRanges.push({
+        id,
+        name: this.subForm.name.trim(),
+        distancesM: distances
+      });
+    } else {
+      const idx = subRanges.findIndex((sr) => sr.id === this.subForm.id);
+      if (idx >= 0) {
+        subRanges[idx] = {
+          id: subRanges[idx].id,
+          name: this.subForm.name.trim(),
+          distancesM: distances
+        };
       }
+    }
+
+    const updated: Venue = {
+      ...venue,
+      subRanges
+    };
+    this.data.updateVenue(updated);
+    this.refresh();
+    this.clearSubForm();
+  }
+
+  deleteSubRange(v: Venue, sr: SubRange) {
+    if (!confirm(`Remove sub-range "${sr.name}"?`)) return;
+
+    const venue = this.venues.find((x) => x.id === v.id);
+    if (!venue) return;
+
+    const subRanges = (venue.subRanges || []).filter((s) => s.id !== sr.id);
+    const updated: Venue = { ...venue, subRanges };
+    this.data.updateVenue(updated);
+    this.refresh();
+
+    if (this.subForm.id === sr.id) {
+      this.clearSubForm();
     }
   }
 }

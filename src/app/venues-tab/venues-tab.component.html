@@ -1,147 +1,185 @@
 <div class="space-y-3 text-xs">
 
+  <!-- Add Venue header card -->
+  <div class="bg-slate-800 rounded-2xl p-3 shadow flex items-center justify-between">
+    <div class="text-sm font-semibold">Add Venue</div>
+    <button
+      class="px-3 py-1 rounded-xl bg-slate-100 text-slate-900 text-xs font-semibold"
+      (click)="toggleForm()">
+      {{ formVisible ? 'Hide' : 'Show' }}
+    </button>
+  </div>
+
   <!-- Venue form -->
-  <div class="bg-slate-800 rounded-xl p-3 shadow space-y-2">
-    <h2 class="text-sm font-semibold mb-1">
-      {{ editing ? 'Edit venue' : 'Add venue' }}
-    </h2>
-
-    <label class="flex flex-col">
-      Name
-      <input
-        [(ngModel)]="form.name"
-        name="venueName"
-        class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
-    </label>
-
+  <div *ngIf="formVisible" class="bg-slate-800 rounded-2xl p-3 shadow space-y-2">
     <div class="grid grid-cols-2 gap-2">
       <label class="flex flex-col">
-        Location
+        Name
         <input
-          [(ngModel)]="form.location"
-          name="venueLocation"
+          [(ngModel)]="venueForm.name"
+          name="venueName"
           class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
       </label>
 
       <label class="flex flex-col">
-        Altitude (m)
+        Location
         <input
-          type="number"
-          [(ngModel)]="form.altitudeM"
-          name="venueAltitude"
+          [(ngModel)]="venueForm.location"
+          name="venueLocation"
+          placeholder="e.g. Vaalwater onderkant"
           class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
       </label>
     </div>
 
-    <label class="flex flex-col">
-      Notes
-      <textarea
-        [(ngModel)]="form.notes"
-        rows="2"
-        class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700"></textarea>
-    </label>
+    <div class="grid grid-cols-2 gap-2">
+      <label class="flex flex-col">
+        Altitude (m)
+        <input
+          type="number"
+          [(ngModel)]="venueForm.altitudeM"
+          name="venueAltitude"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
 
-    <!-- Sub-ranges section -->
-    <div class="mt-2 space-y-1">
-      <div class="flex items-center justify-between">
-        <h3 class="text-xs font-semibold">Sub-ranges</h3>
-        <button
-          class="px-2 py-1 text-[11px] rounded bg-slate-700"
-          (click)="addSubRangeRow()">
-          + Add sub-range
-        </button>
-      </div>
-
-      <p class="text-[11px] text-slate-300">
-        Each sub-range is a firing point or target line on this range (e.g. "Lane 1 – 300 m").
-      </p>
-
-      <div *ngIf="!form.subRanges || form.subRanges.length === 0" class="text-slate-400 text-[11px]">
-        No sub-ranges yet. Add at least one distance.
-      </div>
-
-      <div
-        *ngFor="let sr of form.subRanges; let i = index"
-        class="bg-slate-900 rounded-lg p-2 mt-1 space-y-1">
-        <div class="flex justify-between items-center">
-          <span class="font-semibold text-[11px]">Sub-range #{{ i + 1 }}</span>
-          <button
-            class="text-[11px] text-red-300"
-            (click)="removeSubRangeRow(sr)">
-            Remove
-          </button>
-        </div>
-
-        <div class="grid grid-cols-2 gap-2">
-          <label class="flex flex-col">
-            Name (optional)
-            <input
-              [(ngModel)]="sr.name"
-              name="srName{{i}}"
-              placeholder="600 m gong, Lane 3, etc."
-              class="mt-1 px-2 py-1 rounded bg-slate-950 border border-slate-700" />
-          </label>
-
-          <label class="flex flex-col">
-            Distance (m)
-            <input
-              type="number"
-              [(ngModel)]="sr.distanceM"
-              name="srDist{{i}}"
-              class="mt-1 px-2 py-1 rounded bg-slate-950 border border-slate-700" />
-          </label>
-        </div>
-      </div>
+      <label class="flex flex-col">
+        Notes
+        <input
+          [(ngModel)]="venueForm.notes"
+          name="venueNotes"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
     </div>
 
     <div class="flex justify-end gap-2 mt-2">
       <button
         class="px-3 py-1 text-xs rounded bg-slate-700"
-        (click)="resetForm()">
-        Clear
+        (click)="formVisible = false; editingVenue = null;">
+        Cancel
       </button>
       <button
-        class="px-3 py-1 text-xs rounded bg-emerald-600"
-        (click)="save()">
-        {{ editing ? 'Save changes' : 'Add venue' }}
+        class="px-3 py-1 text-xs rounded bg-emerald-500 text-slate-900 font-semibold"
+        (click)="saveVenue()">
+        {{ editingVenue ? 'Save changes' : 'Add venue' }}
       </button>
     </div>
   </div>
 
-  <!-- Existing venues list -->
-  <div class="bg-slate-800 rounded-xl p-3 shadow space-y-2">
-    <h2 class="text-sm font-semibold mb-1">Saved venues</h2>
+  <!-- Stored venues -->
+  <div class="bg-slate-800 rounded-2xl p-3 shadow space-y-2">
+    <h2 class="text-sm font-semibold mb-1">
+      Stored Venues ({{ venues.length }})
+    </h2>
 
-    <div *ngIf="venues.length === 0" class="text-slate-400 text-[11px]">
-      No venues yet. Add one above.
+    <div *ngIf="venues.length === 0" class="text-[11px] text-slate-400">
+      No venues saved yet. Use "Add Venue" above.
     </div>
 
-    <div *ngFor="let v of venues" class="bg-slate-900 rounded-lg p-2 space-y-1 mt-1">
+    <div
+      *ngFor="let v of venues"
+      class="bg-slate-900 rounded-2xl p-3 mt-1 space-y-2">
+
+      <!-- Header row -->
       <div class="flex justify-between items-center">
         <div>
-          <div class="font-semibold text-[12px]">{{ v.name }}</div>
-          <div class="text-[11px] text-slate-300">
-            {{ v.location || 'No location' }} •
-            {{ v.subRanges.length }} sub-range{{ v.subRanges.length === 1 ? '' : 's' }}
+          <div class="text-sm font-semibold">
+            {{ v.name }}
+          </div>
+          <div *ngIf="v.location" class="text-[11px] text-slate-300">
+            {{ v.location }}
           </div>
         </div>
+
         <div class="flex gap-2 text-[11px]">
           <button
+            class="px-3 py-1 rounded-xl bg-slate-100 text-slate-900 font-semibold"
+            (click)="toggleExpanded(v)">
+            {{ expandedVenueId === v.id ? 'Hide' : 'Show' }}
+          </button>
+          <button
             class="px-2 py-1 rounded bg-slate-700"
-            (click)="edit(v)">
-            Edit
+            (click)="editVenue(v)">
+            Edit Venue
           </button>
           <button
             class="px-2 py-1 rounded bg-red-600"
-            (click)="delete(v)">
+            (click)="deleteVenue(v)">
             Delete
           </button>
         </div>
       </div>
 
-      <div class="text-[11px] text-slate-300" *ngIf="v.subRanges.length > 0">
-        <div *ngFor="let sr of v.subRanges">
-          • {{ sr.name || (sr.distanceM + ' m') }} ({{ sr.distanceM }} m)
+      <!-- Sub-ranges list -->
+      <div *ngIf="expandedVenueId === v.id" class="space-y-2 mt-1">
+        <div *ngIf="v.subRanges.length === 0" class="text-[11px] text-slate-400">
+          No sub-ranges yet. Add one below.
+        </div>
+
+        <div
+          *ngFor="let sr of v.subRanges"
+          class="flex justify-between items-center bg-slate-950 rounded-xl p-2 text-[11px]">
+          <div>
+            <div class="font-semibold">
+              {{ sr.name }}
+              <span *ngIf="sr.distancesM?.length">
+                • {{ sr.distancesM.join(', ') }} m
+              </span>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button
+              class="px-2 py-1 rounded bg-slate-700"
+              (click)="startEditSubRange(v, sr)">
+              Edit
+            </button>
+            <button
+              class="px-2 py-1 rounded bg-red-600"
+              (click)="deleteSubRange(v, sr)">
+              Remove
+            </button>
+          </div>
+        </div>
+
+        <!-- Sub-range editor -->
+        <div class="mt-2 border-t border-slate-800 pt-2 space-y-2">
+          <div class="text-[11px] font-semibold">
+            {{ subForm.id == null ? 'Add new sub-range' : 'Edit sub-range' }}
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <label class="flex flex-col">
+              Name
+              <input
+                [(ngModel)]="subForm.name"
+                name="srName{{v.id}}"
+                placeholder="Warrior, Zeiss, Lane 3"
+                class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+            </label>
+
+            <label class="flex flex-col">
+              Distances (m)
+              <input
+                [(ngModel)]="subForm.distancesText"
+                name="srDistances{{v.id}}"
+                placeholder="500, 578, 780"
+                class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+              <span class="text-[10px] text-slate-400">
+                Comma separated.
+              </span>
+            </label>
+          </div>
+
+          <div class="flex justify-end gap-2">
+            <button
+              class="px-3 py-1 text-xs rounded bg-slate-700"
+              (click)="clearSubForm()">
+              Clear
+            </button>
+            <button
+              class="px-3 py-1 text-xs rounded bg-emerald-500 text-slate-900"
+              (click)="saveSubRange(v)">
+              {{ subForm.id == null ? 'Add sub-range' : 'Save sub-range' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>

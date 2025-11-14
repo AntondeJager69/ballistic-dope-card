@@ -1,60 +1,66 @@
-<div class="min-h-screen flex flex-col bg-slate-900 text-slate-100">
-  <!-- Header -->
-  <header class="p-4 text-center border-b border-slate-700">
-    <h1 class="text-lg font-semibold tracking-wide">
-      Ballistic Dope Card
-    </h1>
-  </header>
+<!-- Outer background fills the monitor -->
+<div class="min-h-screen bg-slate-900 flex justify-center text-slate-100">
 
-  <!-- Content -->
-  <main class="flex-1 overflow-y-auto p-3 pb-20">
-    <section *ngIf="activeTab === 'rifles'">
-      <app-rifles-tab></app-rifles-tab>
-    </section>
+  <!-- Phone-sized app frame -->
+  <div class="w-full max-w-md flex flex-col">
 
-    <section *ngIf="activeTab === 'venues'">
-      <app-venues-tab></app-venues-tab>
-    </section>
+    <!-- Header -->
+    <header class="p-4 text-center border-b border-slate-700">
+      <h1 class="text-base font-semibold tracking-wide">
+        Ballistic Dope Card
+      </h1>
+    </header>
 
-    <section *ngIf="activeTab === 'session'">
-      <app-session-tab></app-session-tab>
-    </section>
+    <!-- Content -->
+    <main class="flex-1 overflow-y-auto p-3 pb-20 text-xs">
+      <section *ngIf="activeTab === 'rifles'">
+        <app-rifles-tab></app-rifles-tab>
+      </section>
 
-    <section *ngIf="activeTab === 'history'">
-      <app-history-tab></app-history-tab>
-    </section>
-  </main>
+      <section *ngIf="activeTab === 'venues'">
+        <app-venues-tab></app-venues-tab>
+      </section>
 
-  <!-- Bottom tab bar -->
-  <nav class="fixed bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-700">
-    <div class="flex text-xs">
-      <button
-        class="flex-1 py-2 font-semibold"
-        [class.text-emerald-400]="activeTab === 'rifles'"
-        (click)="setTab('rifles')">
-        Rifles
-      </button>
+      <section *ngIf="activeTab === 'session'">
+        <app-session-tab></app-session-tab>
+      </section>
 
-      <button
-        class="flex-1 py-2 font-semibold"
-        [class.text-emerald-400]="activeTab === 'venues'"
-        (click)="setTab('venues')">
-        Venues
-      </button>
+      <section *ngIf="activeTab === 'history'">
+        <app-history-tab></app-history-tab>
+      </section>
+    </main>
 
-      <button
-        class="flex-1 py-2 font-semibold"
-        [class.text-emerald-400]="activeTab === 'session'"
-        (click)="setTab('session')">
-        Session
-      </button>
+    <!-- Bottom tab bar INSIDE the phone frame -->
+    <nav class="sticky bottom-0 bg-slate-950 border-t border-slate-700">
+      <div class="flex text-[11px]">
+        <button
+          class="flex-1 py-2 font-semibold"
+          [class.text-emerald-400]="activeTab === 'rifles'"
+          (click)="setTab('rifles')">
+          Rifles
+        </button>
 
-      <button
-        class="flex-1 py-2 font-semibold"
-        [class.text-emerald-400]="activeTab === 'history'"
-        (click)="setTab('history')">
-        History
-      </button>
-    </div>
-  </nav>
+        <button
+          class="flex-1 py-2 font-semibold"
+          [class.text-emerald-400]="activeTab === 'venues'"
+          (click)="setTab('venues')">
+          Venues
+        </button>
+
+        <button
+          class="flex-1 py-2 font-semibold"
+          [class.text-emerald-400]="activeTab === 'session'"
+          (click)="setTab('session')">
+          Session
+        </button>
+
+        <button
+          class="flex-1 py-2 font-semibold"
+          [class.text-emerald-400]="activeTab === 'history'"
+          (click)="setTab('history')">
+          History
+        </button>
+      </div>
+    </nav>
+  </div>
 </div>

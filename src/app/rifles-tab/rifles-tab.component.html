@@ -1,126 +1,274 @@
-<div class="space-y-4">
-  <!-- List -->
-  <div class="bg-slate-800 rounded-xl p-3 shadow">
-    <h2 class="text-sm font-semibold mb-2">Rifles</h2>
+<div class="space-y-3 text-xs">
 
-    <div *ngIf="rifles.length === 0" class="text-xs text-slate-400">
-      No rifles yet. Add one below.
-    </div>
-
-    <ul class="space-y-2">
-      <li *ngFor="let rifle of rifles" class="flex justify-between items-start text-xs bg-slate-900 rounded-lg p-2">
-        <div>
-          <div class="font-semibold">{{ rifle.name }}</div>
-          <div class="text-slate-300">{{ rifle.caliber }}</div>
-          <div class="text-slate-400" *ngIf="rifle.scopeModel">
-            Scope: {{ rifle.scopeModel }} ({{ rifle.scopeClickUnit }} {{ rifle.scopeClickValue || '' }} / click)
-          </div>
-        </div>
-        <div class="flex flex-col gap-1 ml-2">
-          <button class="px-2 py-1 text-[10px] rounded bg-emerald-700"
-                  (click)="edit(rifle)">
-            Edit
-          </button>
-          <button class="px-2 py-1 text-[10px] rounded bg-red-700"
-                  (click)="delete(rifle)">
-            Delete
-          </button>
-        </div>
-      </li>
-    </ul>
+  <!-- Add Rifle header card -->
+  <div class="bg-slate-800 rounded-2xl p-3 shadow flex items-center justify-between">
+    <div class="text-sm font-semibold">Add Rifle</div>
+    <button
+      class="px-3 py-1 rounded-xl bg-slate-100 text-slate-900 text-xs font-semibold"
+      (click)="toggleForm()">
+      {{ formVisible ? 'Hide' : 'Show' }}
+    </button>
   </div>
 
-  <!-- Form -->
-  <div class="bg-slate-800 rounded-xl p-3 shadow space-y-2">
-    <h2 class="text-sm font-semibold">
-      {{ editing ? 'Edit rifle' : 'Add rifle' }}
-    </h2>
-
-    <div class="grid grid-cols-2 gap-2 text-xs">
+  <!-- Rifle form -->
+  <div *ngIf="formVisible" class="bg-slate-800 rounded-2xl p-3 shadow space-y-2">
+    <div class="grid grid-cols-2 gap-2">
       <label class="flex flex-col">
         Name
-        <input [(ngModel)]="form.name" name="name"
-               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+        <input
+          [(ngModel)]="form.name"
+          name="name"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
       </label>
 
       <label class="flex flex-col">
         Caliber
-        <input [(ngModel)]="form.caliber" name="caliber"
-               placeholder="e.g. 6.5 Creedmoor"
-               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+        <input
+          [(ngModel)]="form.caliber"
+          name="caliber"
+          placeholder="33XC, 6.5 Creed, etc."
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+    </div>
+
+    <div class="grid grid-cols-3 gap-2">
+      <label class="flex flex-col">
+        Total rounds
+        <input
+          type="number"
+          [(ngModel)]="form.totalRounds"
+          name="totalRounds"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
       </label>
 
       <label class="flex flex-col">
-        Barrel length (cm)
-        <input type="number" [(ngModel)]="form.barrelLengthCm" name="barrelLength"
-               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+        MV (fps)
+        <input
+          type="number"
+          [(ngModel)]="form.muzzleVelocityFps"
+          name="mvFps"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
       </label>
 
       <label class="flex flex-col">
-        Twist rate
-        <input [(ngModel)]="form.twistRate" name="twistRate"
-               placeholder="e.g. 1:8"
-               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+        Bullet (gr)
+        <input
+          type="number"
+          [(ngModel)]="form.bulletWeightGr"
+          name="bulletWeightGr"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+    </div>
+
+    <div class="grid grid-cols-3 gap-2">
+      <label class="flex flex-col">
+        BC (G1)
+        <input
+          type="number"
+          step="0.001"
+          [(ngModel)]="form.bcG1"
+          name="bcG1"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
       </label>
 
       <label class="flex flex-col">
-        Bullet weight (gr)
-        <input type="number" [(ngModel)]="form.bulletWeightGr" name="bulletWeight"
-               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+        Zero (yd)
+        <input
+          type="number"
+          [(ngModel)]="form.zeroRangeYd"
+          name="zeroYd"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
       </label>
 
       <label class="flex flex-col">
-        Muzzle velocity (m/s)
-        <input type="number" [(ngModel)]="form.muzzleVelocityMs" name="muzzleVelocity"
-               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+        Twist
+        <input
+          [(ngModel)]="form.twist"
+          name="twist"
+          placeholder="1:9"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
       </label>
+    </div>
 
+    <div class="grid grid-cols-3 gap-2">
       <label class="flex flex-col">
-        Zero range (m)
-        <input type="number" [(ngModel)]="form.zeroRangeM" name="zeroRange"
-               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
-      </label>
-
-      <label class="flex flex-col">
-        Scope model
-        <input [(ngModel)]="form.scopeModel" name="scopeModel"
-               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
-      </label>
-
-      <label class="flex flex-col">
-        Click unit
-        <select [(ngModel)]="form.scopeClickUnit" name="scopeClickUnit"
-                class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700">
-          <option *ngFor="let unit of clickUnits" [ngValue]="unit">
-            {{ unit }}
-          </option>
+        Scope unit
+        <select
+          [(ngModel)]="form.scopeClickUnit"
+          name="scopeUnit"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700">
+          <option *ngFor="let u of clickUnits" [ngValue]="u">{{ u }}</option>
         </select>
       </label>
 
       <label class="flex flex-col">
-        Click value
-        <input type="number" step="0.01" [(ngModel)]="form.scopeClickValue" name="scopeClickValue"
-               placeholder="0.1 MIL or 0.25 MOA"
-               class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+        Powder
+        <input
+          [(ngModel)]="form.powder"
+          name="powder"
+          placeholder="N570"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Qty (gn)
+        <input
+          type="number"
+          step="0.01"
+          [(ngModel)]="form.powderChargeGn"
+          name="powderQty"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
       </label>
     </div>
 
-    <label class="flex flex-col text-xs">
+    <div class="grid grid-cols-3 gap-2">
+      <label class="flex flex-col col-span-1">
+        TPL
+        <input
+          [(ngModel)]="form.tpl"
+          name="tpl"
+          placeholder="3'456"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700" />
+      </label>
+    </div>
+
+    <label class="flex flex-col">
       Notes
-      <textarea [(ngModel)]="form.notes" name="notes"
-                rows="2"
-                class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700"></textarea>
+      <textarea
+        [(ngModel)]="form.notes"
+        rows="2"
+        placeholder="Skiet mooi, etc."
+        class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700"></textarea>
     </label>
 
-    <div class="flex justify-end gap-2 pt-2">
-      <button class="px-3 py-1 text-xs rounded bg-slate-700"
-              (click)="resetForm()">
-        Clear
+    <div class="flex justify-end gap-2 mt-2">
+      <button
+        class="px-3 py-1 text-xs rounded bg-slate-700"
+        (click)="formVisible = false; editing = null;">
+        Cancel
       </button>
-      <button class="px-3 py-1 text-xs rounded bg-emerald-600"
-              (click)="save()">
-        {{ editing ? 'Update' : 'Save' }}
+      <button
+        class="px-3 py-1 text-xs rounded bg-emerald-500 text-slate-900 font-semibold"
+        (click)="save()">
+        {{ editing ? 'Save changes' : 'Add rifle' }}
       </button>
     </div>
   </div>
+
+  <!-- Stored rifles list -->
+  <div class="bg-slate-800 rounded-2xl p-3 shadow space-y-2">
+    <h2 class="text-sm font-semibold mb-1">
+      Stored Rifles ({{ rifles.length }})
+    </h2>
+
+    <div *ngIf="rifles.length === 0" class="text-[11px] text-slate-400">
+      No rifles saved yet. Use "Add Rifle" above.
+    </div>
+
+    <div
+      *ngFor="let r of rifles"
+      class="bg-slate-900 rounded-2xl p-3 mt-1 space-y-2">
+
+      <!-- Header row: name + caliber + buttons -->
+      <div class="flex justify-between items-center">
+        <div>
+          <div class="text-sm font-semibold">
+            {{ r.name }}
+            <span class="text-slate-300">({{ r.caliber }})</span>
+          </div>
+        </div>
+        <div class="flex gap-2 text-[11px]">
+          <button
+            class="px-3 py-1 rounded-xl bg-slate-100 text-slate-900 font-semibold"
+            (click)="toggleExpand(r)">
+            {{ expandedId === r.id ? 'Hide' : 'Show' }}
+          </button>
+          <button
+            class="px-2 py-1 rounded bg-slate-700"
+            (click)="edit(r)">
+            Edit
+          </button>
+          <button
+            class="px-2 py-1 rounded bg-slate-700"
+            (click)="duplicate(r)">
+            Copy
+          </button>
+          <button
+            class="px-2 py-1 rounded bg-red-600"
+            (click)="delete(r)">
+            Delete
+          </button>
+        </div>
+      </div>
+
+      <!-- Summary chips -->
+      <div class="flex flex-wrap gap-2 text-[11px]">
+        <span class="px-3 py-1 rounded-full bg-slate-800 border border-slate-600">
+          {{ r.caliber }}
+        </span>
+        <span *ngIf="r.muzzleVelocityFps"
+              class="px-3 py-1 rounded-full bg-slate-800 border border-slate-600">
+          {{ r.muzzleVelocityFps }} fps
+        </span>
+        <span *ngIf="r.bulletWeightGr"
+              class="px-3 py-1 rounded-full bg-slate-800 border border-slate-600">
+          {{ r.bulletWeightGr }} gr
+        </span>
+        <span *ngIf="r.bcG1"
+              class="px-3 py-1 rounded-full bg-slate-800 border border-slate-600">
+          BC {{ r.bcG1 }}
+        </span>
+        <span *ngIf="r.zeroRangeYd"
+              class="px-3 py-1 rounded-full bg-slate-800 border border-slate-600">
+          Zero {{ r.zeroRangeYd }} yd
+        </span>
+        <span *ngIf="r.twist"
+              class="px-3 py-1 rounded-full bg-slate-800 border border-slate-600">
+          Twist {{ r.twist }}
+        </span>
+        <span *ngIf="r.scopeClickUnit"
+              class="px-3 py-1 rounded-full bg-slate-800 border border-slate-600">
+          {{ r.scopeClickUnit }}
+        </span>
+      </div>
+
+      <!-- Expanded load details -->
+      <div *ngIf="expandedId === r.id" class="space-y-1 text-[11px] mt-1">
+        <div class="mt-1">
+          <button
+            class="w-full px-3 py-1 rounded-xl bg-slate-100 text-slate-900 font-semibold">
+            Add / Show Load Data
+          </button>
+        </div>
+
+        <div class="mt-1">
+          <div *ngIf="r.totalRounds != null">
+            <span class="font-semibold">Total Rounds:</span>
+            <span class="ml-1">{{ r.totalRounds }}</span>
+          </div>
+
+          <div *ngIf="r.powder">
+            <span class="font-semibold">Powder:</span>
+            <span class="ml-1">{{ r.powder }}</span>
+          </div>
+
+          <div *ngIf="r.powderChargeGn != null">
+            <span class="font-semibold">Qty (gn):</span>
+            <span class="ml-1">{{ r.powderChargeGn }}</span>
+          </div>
+
+          <div *ngIf="r.tpl">
+            <span class="font-semibold">TPL:</span>
+            <span class="ml-1">{{ r.tpl }}</span>
+          </div>
+
+          <div *ngIf="r.notes">
+            <span class="font-semibold">Notes:</span>
+            <span class="ml-1">{{ r.notes }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
+y

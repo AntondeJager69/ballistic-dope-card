@@ -20,8 +20,6 @@ export class VenuesTabComponent implements OnInit {
     subRanges: []
   };
 
-  subRangeDistance = 100;
-
   constructor(private data: DataService) {}
 
   ngOnInit(): void {
@@ -32,35 +30,50 @@ export class VenuesTabComponent implements OnInit {
     this.venues = this.data.getVenues();
   }
 
-  addSubRange() {
+  // ----- Sub-ranges inside the venue form -----
+
+  addSubRangeRow() {
     if (!this.form.subRanges) this.form.subRanges = [];
     const id = Date.now() + Math.random();
     const subRange: SubRange = {
       id,
-      distanceM: this.subRangeDistance
+      name: '',
+      distanceM: 100
     };
     this.form.subRanges.push(subRange);
-    this.subRangeDistance = this.subRangeDistance + 50;
   }
 
-  removeSubRange(sr: SubRange) {
+  removeSubRangeRow(sr: SubRange) {
     if (!this.form.subRanges) return;
     this.form.subRanges = this.form.subRanges.filter(s => s.id !== sr.id);
   }
 
+  // ----- Editing -----
+
   edit(venue: Venue) {
     this.editing = venue;
-    this.form = { ...venue, subRanges: venue.subRanges.map(sr => ({ ...sr })) };
+    this.form = {
+      id: venue.id,
+      name: venue.name,
+      location: venue.location,
+      altitudeM: venue.altitudeM,
+      notes: venue.notes,
+      subRanges: venue.subRanges.map(sr => ({ ...sr }))
+    };
   }
 
   resetForm() {
     this.editing = null;
     this.form = {
       name: '',
+      location: '',
+      altitudeM: undefined,
+      notes: '',
       subRanges: []
     };
-    this.subRangeDistance = 100;
   }
+
+  // ----- Save / delete -----
 
   save() {
     if (!this.form.name) {
@@ -68,24 +81,40 @@ export class VenuesTabComponent implements OnInit {
       return;
     }
 
-    const baseVenue: Venue = {
-      id: this.editing?.id || 0,
-      name: this.form.name!,
-      location: this.form.location,
-      altitudeM: this.form.altitudeM,
-      notes: this.form.notes,
-      subRanges: this.form.subRanges || []
-    };
+    if (!this.form.subRanges || this.form.subRanges.length === 0) {
+      alert('Add at least one sub-range (distance & optional name) for this venue.');
+      return;
+    }
+
+    const cleanedSubRanges: SubRange[] = (this.form.subRanges || [])
+      .filter(sr => sr.distanceM && sr.distanceM > 0)
+      .map(sr => ({
+        ...sr,
+        name: sr.name?.trim() || undefined
+      }));
+
+    if (cleanedSubRanges.length === 0) {
+      alert('At least one sub-range must have a valid distance.');
+      return;
+    }
 
     if (this.editing) {
-      this.data.updateVenue(baseVenue);
+      const updated: Venue = {
+        id: this.editing.id,
+        name: this.form.name!,
+        location: this.form.location,
+        altitudeM: this.form.altitudeM,
+        notes: this.form.notes,
+        subRanges: cleanedSubRanges
+      };
+      this.data.updateVenue(updated);
     } else {
       this.data.addVenue({
-        name: baseVenue.name,
-        location: baseVenue.location,
-        altitudeM: baseVenue.altitudeM,
-        notes: baseVenue.notes,
-        subRanges: baseVenue.subRanges
+        name: this.form.name!,
+        location: this.form.location,
+        altitudeM: this.form.altitudeM,
+        notes: this.form.notes,
+        subRanges: cleanedSubRanges
       });
     }
 

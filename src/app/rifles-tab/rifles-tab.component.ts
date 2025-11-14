@@ -15,6 +15,9 @@ export class RiflesTabComponent implements OnInit {
   rifles: Rifle[] = [];
   editing: Rifle | null = null;
 
+  formVisible = false;
+  expandedId: number | null = null;
+
   form: Partial<Rifle> = {
     name: '',
     caliber: '',
@@ -33,47 +36,49 @@ export class RiflesTabComponent implements OnInit {
     this.rifles = this.data.getRifles();
   }
 
-  edit(rifle: Rifle) {
-    this.editing = rifle;
-    this.form = { ...rifle };
+  toggleForm() {
+    this.formVisible = !this.formVisible;
+    if (this.formVisible && !this.editing) {
+      this.newRifle();
+    }
   }
 
-  resetForm() {
+  newRifle() {
     this.editing = null;
     this.form = {
       name: '',
       caliber: '',
-      scopeClickUnit: 'MIL'
+      totalRounds: undefined,
+      muzzleVelocityFps: undefined,
+      bulletWeightGr: undefined,
+      bcG1: undefined,
+      zeroRangeYd: undefined,
+      twist: '',
+      scopeClickUnit: 'MIL',
+      powder: '',
+      powderChargeGn: undefined,
+      tpl: '',
+      notes: ''
     };
+    this.formVisible = true;
   }
 
-  save() {
-    if (!this.form.name || !this.form.caliber) {
-      alert('Name and caliber are required.');
-      return;
-    }
+  edit(rifle: Rifle) {
+    this.editing = rifle;
+    this.form = { ...rifle };
+    this.formVisible = true;
+  }
 
-    if (this.editing) {
-      const updated: Rifle = { ...(this.editing as Rifle), ...(this.form as Rifle) };
-      this.data.updateRifle(updated);
-    } else {
-      this.data.addRifle({
-        name: this.form.name!,
-        caliber: this.form.caliber!,
-        barrelLengthCm: this.form.barrelLengthCm,
-        twistRate: this.form.twistRate,
-        bulletWeightGr: this.form.bulletWeightGr,
-        muzzleVelocityMs: this.form.muzzleVelocityMs,
-        zeroRangeM: this.form.zeroRangeM,
-        scopeModel: this.form.scopeModel,
-        scopeClickUnit: this.form.scopeClickUnit,
-        scopeClickValue: this.form.scopeClickValue,
-        notes: this.form.notes
-      });
-    }
-
-    this.resetForm();
+  duplicate(rifle: Rifle) {
+    const copy: Omit<Rifle, 'id'> = {
+      ...rifle,
+      name: rifle.name + ' (copy)'
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (copy as any).id;
+    const added = this.data.addRifle(copy);
     this.refresh();
+    this.expandedId = added.id;
   }
 
   delete(rifle: Rifle) {
@@ -81,8 +86,52 @@ export class RiflesTabComponent implements OnInit {
       this.data.deleteRifle(rifle.id);
       this.refresh();
       if (this.editing?.id === rifle.id) {
-        this.resetForm();
+        this.formVisible = false;
+        this.editing = null;
       }
     }
+  }
+
+  save() {
+    if (!this.form.name || !this.form.caliber) {
+      alert('Rifle name and caliber are required.');
+      return;
+    }
+
+    if (this.editing) {
+      const updated: Rifle = {
+        ...(this.editing as Rifle),
+        ...this.form,
+        id: this.editing.id
+      };
+      this.data.updateRifle(updated);
+      this.expandedId = updated.id;
+    } else {
+      const toAdd: Omit<Rifle, 'id'> = {
+        name: this.form.name!,
+        caliber: this.form.caliber!,
+        totalRounds: this.form.totalRounds,
+        muzzleVelocityFps: this.form.muzzleVelocityFps,
+        bulletWeightGr: this.form.bulletWeightGr,
+        bcG1: this.form.bcG1,
+        zeroRangeYd: this.form.zeroRangeYd,
+        twist: this.form.twist,
+        scopeClickUnit: this.form.scopeClickUnit,
+        powder: this.form.powder,
+        powderChargeGn: this.form.powderChargeGn,
+        tpl: this.form.tpl,
+        notes: this.form.notes
+      };
+      const added = this.data.addRifle(toAdd);
+      this.expandedId = added.id;
+    }
+
+    this.refresh();
+    this.formVisible = false;
+    this.editing = null;
+  }
+
+  toggleExpand(r: Rifle) {
+    this.expandedId = this.expandedId === r.id ? null : r.id;
   }
 }

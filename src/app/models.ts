@@ -1,27 +1,49 @@
-// src/app/models.ts
+// Core domain models for the ballistic dope card app
 
 export type ScopeClickUnit = 'MIL' | 'MOA';
 
 export interface Rifle {
   id: number;
-  name: string;
-  caliber: string;
-  barrelLengthCm?: number;
-  twistRate?: string;
-  bulletWeightGr?: number;
-  muzzleVelocityMs?: number;
-  zeroRangeM?: number;
+
+  // Basic rifle info
+  name: string;                 // e.g. "Remington"
+  caliber: string;              // e.g. "33XC"
+  barrelLengthCm?: number;      // optional – one of these
+  barrelLengthInch?: number;    // optional
+
+  twistRate?: string;           // e.g. "1:9"
+  muzzleVelocityFps?: number;   // e.g. 3025
+
+  // Optic
   scopeModel?: string;
-  scopeClickUnit?: ScopeClickUnit;
-  scopeClickValue?: number; // e.g. 0.1 MIL or 0.25 MOA
+  scopeClickUnit?: ScopeClickUnit; // MIL / MOA
+
+  // Bullet
+  bulletName?: string;          // e.g. "Berger Hybrid"
+  bulletWeightGr?: number;      // e.g. 300
+  bulletBcG1?: number;          // e.g. 0.471
+
+  notes?: string;
+}
+
+export interface LoadData {
+  id: number;
+  rifleId: number;          // which rifle this belongs to
+
+  powder: string;
+  powderChargeGn: number;
+  coalMm?: number;
+  coalInch?: number;
+  primer: string;
   notes?: string;
 }
 
 export interface SubRange {
   id: number;
+  name?: string;           // e.g. "600 m gong", "Lane 3"
   distanceM: number;
   firingPointName?: string;
-  targetType?: string; // steel, paper, gong, etc.
+  targetType?: string;
 }
 
 export interface Venue {
@@ -37,29 +59,26 @@ export interface Environment {
   temperatureC?: number;
   pressureHpa?: number;
   humidityPercent?: number;
+  densityAltitudeM?: number;
   windSpeedMps?: number;
   windDirectionDeg?: number;
-  densityAltitudeM?: number;
-  lightConditions?: string; // e.g. "Overcast", "Bright sun"
+  lightConditions?: string;
 }
 
 export interface DistanceDope {
-  subRangeId: number;
+  subRangeId?: number;
   distanceM: number;
   elevationClicks?: number;
   windageClicks?: number;
   elevationMil?: number;
   windageMil?: number;
-  elevationMoa?: number;
-  windageMoa?: number;
   groupSizeMoA?: number;
-  impactsDescription?: string; // e.g. "0.3 mil high, 0.2 left"
-  notes?: string;
+  impactsDescription?: string;
 }
 
 export interface Session {
   id: number;
-  date: string; // ISO string
+  date: string;           // ISO string
   rifleId: number;
   venueId: number;
   title?: string;

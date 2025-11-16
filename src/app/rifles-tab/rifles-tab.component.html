@@ -274,8 +274,14 @@
           </div>
         </ng-template>
 
-        <!-- Load editor -->
-        <div class="border-t border-slate-800 pt-2 mt-2 space-y-2">
+               <!-- Load editor -->
+        <div
+          *ngIf="editingLoadId != null
+                || loadForm.powder !== undefined
+                || loadForm.powderChargeGr !== undefined
+                || loadForm.coal
+                || loadForm.primer"
+          class="border-t border-slate-800 pt-2 mt-2 space-y-2">
           <div class="text-[11px] font-semibold">
             {{ editingLoadId != null ? 'Edit load' : 'Add load' }}
           </div>
@@ -331,7 +337,7 @@
             </button>
           </div>
         </div>
-      </div>
+
 
       <!-- Optional rifle notes -->
       <div *ngIf="r.notes" class="text-[11px] text-slate-300 mt-1">

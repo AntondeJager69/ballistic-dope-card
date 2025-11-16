@@ -1,123 +1,166 @@
-// src/app/data.service.ts
 import { Injectable } from '@angular/core';
-import { Rifle, Venue, Session, SubRange, Environment, DistanceDope } from './models';
+import {
+  Rifle,
+  Venue,
+  Session,
+} from './models';
 
-interface StoredData {
+interface AppStore {
+  nextRifleId: number;
+  nextVenueId: number;
+  nextSessionId: number;
   rifles: Rifle[];
   venues: Venue[];
   sessions: Session[];
-  lastId: number;
 }
+
+const STORAGE_KEY = 'ballistic-dope-card-v1';
 
 @Injectable({
   providedIn: 'root'
 })
 export class DataService {
-  private storageKey = 'ballisticDopeApp';
-  private data: StoredData = {
-    rifles: [],
-    venues: [],
-    sessions: [],
-    lastId: 0
-  };
+  private store: AppStore;
 
   constructor() {
-    this.load();
+    this.store = this.loadStore();
   }
 
-  private load() {
-    const raw = localStorage.getItem(this.storageKey);
-    if (raw) {
-      this.data = JSON.parse(raw);
+  // ---------- Storage helpers ----------
+
+  private loadStore(): AppStore {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed: AppStore = JSON.parse(raw);
+        return {
+          nextRifleId: parsed.nextRifleId ?? 1,
+          nextVenueId: parsed.nextVenueId ?? 1,
+          nextSessionId: parsed.nextSessionId ?? 1,
+          rifles: parsed.rifles ?? [],
+          venues: parsed.venues ?? [],
+          sessions: parsed.sessions ?? []
+        };
+      }
+    } catch {
+      // ignore
+    }
+
+    return {
+      nextRifleId: 1,
+      nextVenueId: 1,
+      nextSessionId: 1,
+      rifles: [],
+      venues: [],
+      sessions: []
+    };
+  }
+
+  private saveStore() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.store));
+    } catch {
+      // ignore for now
     }
   }
 
-  private save() {
-    localStorage.setItem(this.storageKey, JSON.stringify(this.data));
-  }
+  // ---------- Rifles ----------
 
-  private nextId(): number {
-    this.data.lastId += 1;
-    return this.data.lastId;
-  }
-
-  // ---- Rifles ----
   getRifles(): Rifle[] {
-    return [...this.data.rifles];
+    return this.store.rifles;
   }
 
   addRifle(rifle: Omit<Rifle, 'id'>): Rifle {
-    const newRifle: Rifle = { ...rifle, id: this.nextId() };
-    this.data.rifles.push(newRifle);
-    this.save();
+    const newRifle: Rifle = {
+      ...rifle,
+      id: this.store.nextRifleId++
+    };
+    this.store.rifles.push(newRifle);
+    this.saveStore();
     return newRifle;
   }
 
   updateRifle(rifle: Rifle) {
-    const idx = this.data.rifles.findIndex(r => r.id === rifle.id);
+    const idx = this.store.rifles.findIndex(r => r.id === rifle.id);
     if (idx >= 0) {
-      this.data.rifles[idx] = rifle;
-      this.save();
+      this.store.rifles[idx] = rifle;
+      this.saveStore();
     }
   }
 
   deleteRifle(id: number) {
-    this.data.rifles = this.data.rifles.filter(r => r.id !== id);
-    this.save();
+    this.store.rifles = this.store.rifles.filter(r => r.id !== id);
+    this.saveStore();
   }
 
-  // ---- Venues ----
+  // 🔥 increment round count, never decreases
+  incrementRifleRoundCount(rifleId: number, delta: number) {
+    if (!delta || delta <= 0) return;
+    const rifle = this.store.rifles.find(r => r.id === rifleId);
+    if (!rifle) return;
+    rifle.roundCount = (rifle.roundCount || 0) + delta;
+    this.saveStore();
+  }
+
+  // ---------- Venues ----------
+
   getVenues(): Venue[] {
-    return [...this.data.venues];
+    return this.store.venues;
+  }
+
+  getVenueById(id: number): Venue | undefined {
+    return this.store.venues.find(v => v.id === id);
   }
 
   addVenue(venue: Omit<Venue, 'id'>): Venue {
-    const newVenue: Venue = { ...venue, id: this.nextId() };
-    this.data.venues.push(newVenue);
-    this.save();
+    const newVenue: Venue = {
+      ...venue,
+      id: this.store.nextVenueId++
+    };
+    this.store.venues.push(newVenue);
+    this.saveStore();
     return newVenue;
   }
 
   updateVenue(venue: Venue) {
-    const idx = this.data.venues.findIndex(v => v.id === venue.id);
+    const idx = this.store.venues.findIndex(v => v.id === venue.id);
     if (idx >= 0) {
-      this.data.venues[idx] = venue;
-      this.save();
+      this.store.venues[idx] = venue;
+      this.saveStore();
     }
   }
 
   deleteVenue(id: number) {
-    this.data.venues = this.data.venues.filter(v => v.id !== id);
-    this.save();
+    this.store.venues = this.store.venues.filter(v => v.id !== id);
+    this.saveStore();
   }
 
-  // ---- Sessions ----
+  // ---------- Sessions ----------
+
   getSessions(): Session[] {
-    return [...this.data.sessions].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
+    return this.store.sessions;
   }
 
   addSession(session: Omit<Session, 'id'>): Session {
-    const newSession: Session = { ...session, id: this.nextId() };
-    this.data.sessions.push(newSession);
-    this.save();
+    const newSession: Session = {
+      ...session,
+      id: this.store.nextSessionId++
+    };
+    this.store.sessions.push(newSession);
+    this.saveStore();
     return newSession;
   }
 
+  updateSession(session: Session) {
+    const idx = this.store.sessions.findIndex(s => s.id === session.id);
+    if (idx >= 0) {
+      this.store.sessions[idx] = session;
+      this.saveStore();
+    }
+  }
+
   deleteSession(id: number) {
-    this.data.sessions = this.data.sessions.filter(s => s.id !== id);
-    this.save();
-  }
-
-  // Convenience lookups
-  getRifleById(id: number | null | undefined): Rifle | undefined {
-    if (!id) return undefined;
-    return this.data.rifles.find(r => r.id === id);
-  }
-
-  getVenueById(id: number | null | undefined): Venue | undefined {
-    if (!id) return undefined;
-    return this.data.venues.find(v => v.id === id);
+    this.store.sessions = this.store.sessions.filter(s => s.id !== id);
+    this.saveStore();
   }
 }

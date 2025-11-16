@@ -1,52 +1,34 @@
-// Core domain models for the ballistic dope card app
-
-export type ScopeClickUnit = 'MIL' | 'MOA';
-
-// ---------- Rifle & load data ----------
-
-export interface LoadData {
+export interface RifleLoad {
   id: number;
-  powder: string;          // e.g. N570
-  powderChargeGr: number;  // grains
-  coal: string;            // COAL text, e.g. 3.456"
-  primer: string;          // e.g. "CCI 450"
+  powder: string;
+  chargeGn: number;
+  coal: string;
+  primer: string;
 }
+
+export type ScopeUnit = 'MIL' | 'MOA';
 
 export interface Rifle {
   id: number;
-
-  // Identity
-  name: string;            // e.g. "Remington"
-  caliber: string;         // e.g. "33XC"
-
-  // Barrel
-  barrelLength?: number;   // numeric value
-  barrelLengthUnit?: 'cm' | 'in';
-  twistRate?: string;      // e.g. "1:9"
-
-  // Ballistics
-  muzzleVelocityFps?: number; // fps
-  scope?: string;             // scope model
-  scopeClickUnit?: ScopeClickUnit;
-
-  // Bullet
-  bulletWeightGr?: number;
-  bulletBc?: number;
-  bulletName?: string;    // e.g. "300gr Berger Hybrid"
-
-  // Notes
+  name: string;
+  caliber: string;
+  barrelLength: number | null;
+  barrelUnit: 'cm' | 'inch';
+  twistRate: string;
+  muzzleVelocityFps: number | null;
+  scopeUnit: ScopeUnit;
+  bulletBc: string;
+  bulletWeightGr: number | null;
+  bulletName: string;
   notes?: string;
-
-  // Load data entries (separate panel)
-  loads?: LoadData[];
+  roundCount?: number;       // 🔥 total rounds through this rifle
+  loads: RifleLoad[];
 }
-
-// ---------- Venues & sub-ranges ----------
 
 export interface SubRange {
   id: number;
-  name: string;          // e.g. "Warrior", "Zeiss", "Lane 3"
-  distancesM: number[];  // e.g. [500, 578, 780]
+  name: string;
+  distancesM: number[];
 }
 
 export interface Venue {
@@ -57,8 +39,6 @@ export interface Venue {
   notes?: string;
   subRanges: SubRange[];
 }
-
-// ---------- Sessions / environment ----------
 
 export interface Environment {
   temperatureC?: number;
@@ -73,21 +53,20 @@ export interface Environment {
 export interface DistanceDope {
   subRangeId?: number;
   distanceM: number;
-  elevationClicks?: number;
-  windageClicks?: number;
   elevationMil?: number;
   windageMil?: number;
-  groupSizeMoA?: number;
   impactsDescription?: string;
+  // (clicks/group MOA were removed in your last change)
 }
 
 export interface Session {
   id: number;
-  date: string;           // ISO string
+  date: string;
   rifleId: number;
   venueId: number;
   title?: string;
   environment: Environment;
   dope: DistanceDope[];
   notes?: string;
+  completed?: boolean;
 }

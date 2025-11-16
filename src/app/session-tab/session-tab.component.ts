@@ -4,7 +4,6 @@ import { FormsModule } from '@angular/forms';
 import { DataService } from '../data.service';
 import {
   Rifle,
-  ScopeClickUnit,
   Venue,
   SubRange,
   Environment,
@@ -12,11 +11,7 @@ import {
   Session
 } from '../models';
 
-interface WizardSubRange {
-  id: number;
-  name: string;
-  distancesText: string;
-}
+type WizardStep = 'setup' | 'environment' | 'shots' | 'complete';
 
 @Component({
   selector: 'app-session-tab',
@@ -26,242 +21,173 @@ interface WizardSubRange {
   styleUrls: ['./session-tab.component.css']
 })
 export class SessionTabComponent implements OnInit {
+  step: WizardStep = 'setup';
+
   rifles: Rifle[] = [];
   venues: Venue[] = [];
 
   selectedRifleId: number | null = null;
   selectedVenueId: number | null = null;
+  selectedSubRangeId: number | null = null;
 
-  environment: Environment = {};
-  dopeRows: DistanceDope[] = [];
-  notes = '';
   title = '';
+  environment: Environment = {};
 
-  // ----- Rifle wizard -----
-  showRifleWizard = false;
-  rifleWizardForm: Partial<Rifle> = {
-    name: '',
-    caliber: '',
-    scopeClickUnit: 'MIL'
-  };
-  clickUnits: ScopeClickUnit[] = ['MIL', 'MOA'];
+  shotCount: number | null = null;
+  selectedDistances: number[] = [];
+  notes = '';
 
-  // ----- Venue wizard -----
-  showVenueWizard = false;
-  venueWizardForm: Partial<Venue> = {
-    name: '',
-    location: '',
-    altitudeM: undefined,
-    notes: ''
-  };
-  venueWizardSubRanges: WizardSubRange[] = [];
+  dopeRows: DistanceDope[] = [];
+  completeMessage = '';
 
   constructor(private data: DataService) {}
 
   ngOnInit(): void {
     this.rifles = this.data.getRifles();
     this.venues = this.data.getVenues();
-
-    if (this.rifles.length === 0) {
-      this.showRifleWizard = true;
-    }
-    if (this.venues.length === 0) {
-      this.showVenueWizard = true;
-      if (this.venueWizardSubRanges.length === 0) {
-        this.addVenueWizardSubRange();
-      }
-    }
   }
 
-  // ---------- Utilities ----------
-
-  private parseDistances(text: string): number[] {
-    return (text || '')
-      .split(/[;,]/)
-      .map((t) => parseFloat(t.trim()))
-      .filter((n) => !isNaN(n) && n > 0);
+  get selectedVenue(): Venue | undefined {
+    return this.venues.find(v => v.id === this.selectedVenueId);
   }
 
-  // ---------- Venue selection & dope rows ----------
+  get subRanges(): SubRange[] {
+    const v = this.selectedVenue;
+    return v?.subRanges ?? [];
+  }
+
+  get selectedSubRange(): SubRange | undefined {
+    const list = this.subRanges;
+    return list.find(sr => sr.id === this.selectedSubRangeId);
+  }
+
+  get distanceOptions(): number[] {
+    const sr = this.selectedSubRange;
+    return sr?.distancesM ?? [];
+  }
 
   onVenueChange() {
-    const venue = this.data.getVenueById(this.selectedVenueId);
-    if (!venue) {
-      this.dopeRows = [];
+    const srs = this.subRanges;
+    if (srs.length > 0) {
+      this.selectedSubRangeId = srs[0].id;
+    } else {
+      this.selectedSubRangeId = null;
+    }
+    this.selectedDistances = [];
+  }
+
+  onSubRangeChange() {
+    this.selectedDistances = [];
+  }
+
+  nextFromSetup() {
+    if (!this.title.trim()) {
+      alert('Please enter a session title.');
+      return;
+    }
+    if (!this.selectedRifleId) {
+      alert('Please select a rifle.');
+      return;
+    }
+    if (!this.selectedVenueId) {
+      alert('Please select a venue.');
+      return;
+    }
+    if (!this.selectedSubRangeId) {
+      alert('Please select a sub-range at the venue.');
       return;
     }
 
-    const rows: DistanceDope[] = [];
-    (venue.subRanges || []).forEach((sr: any) => {
-      let distances: number[] = [];
-      if (Array.isArray(sr.distancesM)) {
-        distances = sr.distancesM;
-      } else if (typeof sr.distanceM === 'number') {
-        // backward compatibility with older shape
-        distances = [sr.distanceM];
-      }
-
-      distances.forEach((d: number) => {
-        rows.push({
-          subRangeId: sr.id,
-          distanceM: d
-        });
-      });
-    });
-
-    this.dopeRows = rows;
+    this.step = 'environment';
   }
 
-  // ---------- Rifle wizard ----------
-
-  startRifleWizard() {
-    this.showRifleWizard = true;
+  nextFromEnvironment() {
+    this.step = 'shots';
   }
 
-  cancelRifleWizard() {
-    this.showRifleWizard = false;
-    this.rifleWizardForm = {
-      name: '',
-      caliber: '',
-      scopeClickUnit: 'MIL'
-    };
+  toggleDistance(d: number) {
+    if (this.selectedDistances.includes(d)) {
+      this.selectedDistances = this.selectedDistances.filter(x => x !== d);
+    } else {
+      this.selectedDistances = [...this.selectedDistances, d].sort((a, b) => a - b);
+    }
   }
 
-  saveRifleFromWizard() {
-    if (!this.rifleWizardForm.name || !this.rifleWizardForm.caliber) {
-      alert('Please enter at least a rifle name and caliber.');
+  goShoot() {
+    if (this.selectedDistances.length === 0) {
+      alert('Select at least one distance to shoot.');
+      return;
+    }
+    if (!this.selectedRifleId || !this.selectedVenueId || !this.selectedSubRangeId) {
+      alert('Setup is incomplete. Please go back and select rifle, venue and sub-range.');
       return;
     }
 
-    const newRifle = this.data.addRifle({
-      name: this.rifleWizardForm.name!,
-      caliber: this.rifleWizardForm.caliber!,
-      scopeClickUnit: this.rifleWizardForm.scopeClickUnit
-    });
+    // Build dope rows for each selected distance
+    this.dopeRows = this.selectedDistances.map(distance => ({
+      subRangeId: this.selectedSubRangeId!,
+      distanceM: distance
+    }));
 
-    this.rifles = this.data.getRifles();
-    this.selectedRifleId = newRifle.id;
-
-    this.cancelRifleWizard();
-  }
-
-  // ---------- Venue wizard ----------
-
-  startVenueWizard() {
-    this.showVenueWizard = true;
-    if (this.venueWizardSubRanges.length === 0) {
-      this.addVenueWizardSubRange();
+    const sessionNotesParts: string[] = [];
+    if (this.notes?.trim()) {
+      sessionNotesParts.push(this.notes.trim());
     }
-  }
+    const sr = this.selectedSubRange;
+    const countText =
+      this.shotCount && this.shotCount > 0
+        ? `${this.shotCount} shots planned`
+        : 'Shot count not specified';
 
-  cancelVenueWizard() {
-    this.showVenueWizard = false;
-    this.venueWizardForm = {
-      name: '',
-      location: '',
-      altitudeM: undefined,
-      notes: ''
-    };
-    this.venueWizardSubRanges = [];
-  }
-
-  addVenueWizardSubRange() {
-    const id = Date.now() + Math.random();
-    this.venueWizardSubRanges.push({
-      id,
-      name: '',
-      distancesText: ''
-    });
-  }
-
-  removeVenueWizardSubRange(sr: WizardSubRange) {
-    this.venueWizardSubRanges = this.venueWizardSubRanges.filter(
-      (s) => s.id !== sr.id
+    sessionNotesParts.push(
+      `${countText} at distances: ${this.selectedDistances.join(', ')} m` +
+        (sr ? ` on sub-range "${sr.name}"` : '')
     );
-  }
 
-  saveVenueFromWizard() {
-    if (!this.venueWizardForm.name) {
-      alert('Please enter a venue name.');
-      return;
-    }
-
-    const subRanges: SubRange[] = [];
-    for (const ws of this.venueWizardSubRanges) {
-      const name = ws.name.trim();
-      const distances = this.parseDistances(ws.distancesText);
-      if (!name || distances.length === 0) {
-        continue;
-      }
-      subRanges.push({
-        id: ws.id,
-        name,
-        distancesM: distances
-      });
-    }
-
-    if (subRanges.length === 0) {
-      alert('Add at least one sub-range with valid distances.');
-      return;
-    }
-
-    const newVenue = this.data.addVenue({
-      name: this.venueWizardForm.name!,
-      location: this.venueWizardForm.location,
-      altitudeM: this.venueWizardForm.altitudeM,
-      notes: this.venueWizardForm.notes,
-      subRanges
-    });
-
-    this.venues = this.data.getVenues();
-    this.selectedVenueId = newVenue.id;
-    this.onVenueChange();
-
-    this.cancelVenueWizard();
-  }
-
-  // ---------- Session saving ----------
-
-  saveSession() {
-    if (!this.selectedRifleId || !this.selectedVenueId) {
-      alert('Select a rifle and a venue before saving the session.');
-      return;
-    }
-
-    const session: Omit<Session, 'id'> = {
+    const sessionToSave: Omit<Session, 'id'> = {
       date: new Date().toISOString(),
       rifleId: this.selectedRifleId,
       venueId: this.selectedVenueId,
       title: this.title || undefined,
       environment: this.environment,
       dope: this.dopeRows,
-      notes: this.notes || undefined
+      notes: sessionNotesParts.join(' | '),
+      completed: false
     };
 
-    this.data.addSession(session);
-    alert('Session saved to history.');
-    this.reset();
+    this.data.addSession(sessionToSave);
+
+    // 🔥 increment rifle round count using planned shot count
+    if (this.shotCount && this.shotCount > 0) {
+      this.data.incrementRifleRoundCount(this.selectedRifleId, this.shotCount);
+    }
+
+    this.completeMessage =
+      'Session saved to History. Go shoot! After you are done, open the History tab to enter your actual dope.';
+    this.step = 'complete';
   }
 
-  reset() {
+  backToSetup() {
+    this.step = 'setup';
+  }
+
+  backToEnvironment() {
+    this.step = 'environment';
+  }
+
+  newSession() {
+    this.step = 'setup';
+    this.title = '';
     this.selectedRifleId = null;
     this.selectedVenueId = null;
+    this.selectedSubRangeId = null;
     this.environment = {};
-    this.dopeRows = [];
+    this.shotCount = null;
+    this.selectedDistances = [];
     this.notes = '';
-    this.title = '';
-
+    this.dopeRows = [];
+    this.completeMessage = '';
     this.rifles = this.data.getRifles();
     this.venues = this.data.getVenues();
-
-    if (this.rifles.length === 0) {
-      this.showRifleWizard = true;
-    }
-    if (this.venues.length === 0) {
-      this.showVenueWizard = true;
-      if (this.venueWizardSubRanges.length === 0) {
-        this.addVenueWizardSubRange();
-      }
-    }
   }
 }

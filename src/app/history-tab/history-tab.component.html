@@ -1,89 +1,174 @@
 <div class="space-y-3 text-xs">
-  <div class="bg-slate-800 rounded-xl p-3 shadow">
-    <h2 class="text-sm font-semibold mb-2">History</h2>
 
-    <div *ngIf="sessions.length === 0" class="text-slate-400">
-      No sessions saved yet. After you record dope, save it from the Session tab.
-    </div>
+  <!-- No sessions yet -->
+  <div
+    *ngIf="sessions.length === 0"
+    class="bg-slate-800 rounded-xl p-3 text-[11px] text-slate-200">
+    No sessions saved yet. Create one from the Session tab with the wizard.
+  </div>
 
-    <div class="space-y-2">
-      <div *ngFor="let s of sessions"
-           class="bg-slate-900 rounded-lg p-2">
-        <div class="flex justify-between items-center">
-          <div>
-            <div class="font-semibold">
-              {{ s.title || 'Session' }} • {{ formatDate(s.date) }}
-            </div>
-            <div class="text-slate-400 text-[11px]">
-              Rifle #{{ s.rifleId }} • Venue #{{ s.venueId }}
-            </div>
+  <!-- Sessions list -->
+  <div *ngIf="sessions.length > 0" class="bg-slate-800 rounded-xl p-3 space-y-2">
+    <h2 class="text-sm font-semibold mb-1">History</h2>
+
+    <div
+      *ngFor="let s of sessions"
+      class="bg-slate-900 rounded-xl p-2 flex items-center justify-between gap-2"
+      [class.border]="selectedSessionId === s.id"
+      [class.border-emerald-500]="selectedSessionId === s.id">
+
+      <div class="flex-1">
+        <div class="flex items-center gap-2">
+          <div class="text-[11px] font-semibold">
+            {{ s.title || 'Untitled session' }}
           </div>
-          <div class="flex gap-1">
-            <button class="px-2 py-1 text-[10px] rounded bg-slate-700"
-                    (click)="toggle(s)">
-              {{ expandedId === s.id ? 'Hide' : 'View' }}
-            </button>
-            <button class="px-2 py-1 text-[10px] rounded bg-red-700"
-                    (click)="delete(s)">
-              Delete
-            </button>
-          </div>
+          <span
+            class="px-2 py-[2px] rounded-full text-[10px] font-semibold"
+            [ngClass]="getStatusClass(s)">
+            {{ getStatusLabel(s) }}
+          </span>
         </div>
-
-        <div *ngIf="expandedId === s.id" class="mt-2 space-y-2">
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <div class="font-semibold text-[11px]">Environment</div>
-              <ul class="text-slate-300 text-[11px] space-y-0.5">
-                <li *ngIf="s.environment.temperatureC !== undefined">
-                  Temp: {{ s.environment.temperatureC }} °C
-                </li>
-                <li *ngIf="s.environment.pressureHpa !== undefined">
-                  Pressure: {{ s.environment.pressureHpa }} hPa
-                </li>
-                <li *ngIf="s.environment.humidityPercent !== undefined">
-                  Humidity: {{ s.environment.humidityPercent }} %
-                </li>
-                <li *ngIf="s.environment.densityAltitudeM !== undefined">
-                  DA: {{ s.environment.densityAltitudeM }} m
-                </li>
-                <li *ngIf="s.environment.windSpeedMps !== undefined">
-                  Wind: {{ s.environment.windSpeedMps }} m/s @ {{ s.environment.windDirectionDeg || '?' }}°
-                </li>
-                <li *ngIf="s.environment.lightConditions">
-                  Light: {{ s.environment.lightConditions }}
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div>
-            <div class="font-semibold text-[11px] mb-1">Dope</div>
-            <div class="space-y-1">
-              <div *ngFor="let d of s.dope"
-                   class="bg-slate-950 rounded px-2 py-1">
-                <div class="font-semibold text-[11px]">
-                  {{ d.distanceM }} m
-                </div>
-                <div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-300">
-                  <span *ngIf="d.elevationClicks !== undefined">Elev: {{ d.elevationClicks }} clicks</span>
-                  <span *ngIf="d.windageClicks !== undefined">Wind: {{ d.windageClicks }} clicks</span>
-                  <span *ngIf="d.elevationMil !== undefined">Elev: {{ d.elevationMil }} mil</span>
-                  <span *ngIf="d.windageMil !== undefined">Wind: {{ d.windageMil }} mil</span>
-                  <span *ngIf="d.groupSizeMoA !== undefined">Group: {{ d.groupSizeMoA }} MOA</span>
-                </div>
-                <div *ngIf="d.impactsDescription" class="text-slate-400 text-[11px] mt-1">
-                  {{ d.impactsDescription }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div *ngIf="s.notes" class="text-slate-300 text-[11px]">
-            <span class="font-semibold">Notes:</span> {{ s.notes }}
-          </div>
+        <div class="text-[10px] text-slate-300">
+          {{ s.date | date: 'yyyy-MM-dd HH:mm' }} •
+          {{ getRifleName(s.rifleId) }} @ {{ getVenueName(s.venueId) }}
         </div>
+      </div>
+
+      <div class="flex gap-2 text-[11px]">
+        <button
+          class="px-2 py-1 rounded bg-slate-700"
+          (click)="selectSession(s)">
+          Open
+        </button>
+        <button
+          class="px-2 py-1 rounded bg-red-600"
+          (click)="deleteSession(s)">
+          Delete
+        </button>
       </div>
     </div>
   </div>
+
+  <!-- Detailed editor for selected session -->
+  <div *ngIf="editSession" class="bg-slate-800 rounded-xl p-3 space-y-3">
+
+    <!-- Light red notice when session is still planned -->
+    <div
+      *ngIf="!editSession.completed"
+      class="mb-2 bg-rose-900/40 border border-rose-500 text-[11px] text-rose-100 rounded-lg p-2">
+      This session only has planned data. Enter your actual dope and press
+      <strong>Save</strong> to complete it.
+    </div>
+
+    <div class="flex justify-between items-center">
+      <div>
+        <div class="text-sm font-semibold">
+          {{ editSession.title || 'Untitled session' }}
+        </div>
+        <div class="text-[10px] text-slate-300">
+          {{ editSession.date | date: 'yyyy-MM-dd HH:mm' }} •
+          {{ getRifleName(editSession.rifleId) }} @
+          {{ getVenueName(editSession.venueId) }}
+        </div>
+      </div>
+      <span
+        class="px-2 py-[2px] rounded-full text-[10px] font-semibold"
+        [ngClass]="getStatusClass(editSession)">
+        {{ getStatusLabel(editSession) }}
+      </span>
+    </div>
+
+    <!-- Environment summary -->
+    <div class="bg-slate-900 rounded-lg p-2 space-y-1">
+      <div class="text-[11px] font-semibold">Environment (recorded)</div>
+      <div class="grid grid-cols-2 gap-1 text-[10px] text-slate-300">
+        <div *ngIf="editSession.environment.temperatureC != null">
+          Temp: {{ editSession.environment.temperatureC }} °C
+        </div>
+        <div *ngIf="editSession.environment.pressureHpa != null">
+          Pressure: {{ editSession.environment.pressureHpa }} hPa
+        </div>
+        <div *ngIf="editSession.environment.humidityPercent != null">
+          Humidity: {{ editSession.environment.humidityPercent }} %
+        </div>
+        <div *ngIf="editSession.environment.densityAltitudeM != null">
+          DA: {{ editSession.environment.densityAltitudeM }} m
+        </div>
+        <div *ngIf="editSession.environment.windSpeedMps != null">
+          Wind: {{ editSession.environment.windSpeedMps }} m/s
+        </div>
+        <div *ngIf="editSession.environment.windDirectionDeg != null">
+          Wind dir: {{ editSession.environment.windDirectionDeg }} °
+        </div>
+        <div *ngIf="editSession.environment.lightConditions">
+          Light: {{ editSession.environment.lightConditions }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Actual dope entry (simplified) -->
+    <div class="space-y-2">
+      <div class="text-[11px] font-semibold">Actual dope & results</div>
+
+      <div
+        *ngFor="let row of editSession.dope; let i = index"
+        class="bg-slate-900 rounded-lg p-2 space-y-1">
+        <div class="flex justify-between items-center text-[11px] font-semibold">
+          <span>
+            {{ row.distanceM }} m
+            <span class="text-slate-300" *ngIf="getSubRangeName(row)">
+              • {{ getSubRangeName(row) }}
+            </span>
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 mt-1">
+          <label class="flex flex-col">
+            Elevation (mil)
+            <input
+              type="number"
+              step="0.01"
+              [(ngModel)]="row.elevationMil"
+              class="mt-1 px-2 py-1 rounded bg-slate-950 border border-slate-700" />
+          </label>
+
+          <label class="flex flex-col">
+            Windage (mil)
+            <input
+              type="number"
+              step="0.01"
+              [(ngModel)]="row.windageMil"
+              class="mt-1 px-2 py-1 rounded bg-slate-950 border border-slate-700" />
+          </label>
+        </div>
+
+        <label class="flex flex-col mt-1">
+          Impacts / notes
+          <textarea
+            rows="2"
+            [(ngModel)]="row.impactsDescription"
+            class="mt-1 px-2 py-1 rounded bg-slate-950 border border-slate-700"></textarea>
+        </label>
+      </div>
+    </div>
+
+    <!-- Session notes -->
+    <label class="flex flex-col mt-2">
+      Session notes
+      <textarea
+        [(ngModel)]="editSession.notes"
+        rows="3"
+        class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700"></textarea>
+    </label>
+
+    <!-- Single Save button (marks completed and collapses) -->
+    <div class="flex justify-end mt-3">
+      <button
+        class="px-3 py-1.5 text-xs rounded bg-emerald-500 text-slate-900 font-semibold"
+        (click)="saveSession()">
+        Save
+      </button>
+    </div>
+  </div>
+
 </div>

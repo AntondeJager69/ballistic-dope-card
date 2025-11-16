@@ -14,7 +14,7 @@ type TabName = 'menu' | 'rifles' | 'venues' | 'session' | 'history';
   standalone: true,
   imports: [
     CommonModule,
-    FormsModule,          // needed for ngModel in the menu reports form
+    FormsModule,
     RiflesTabComponent,
     VenuesTabComponent,
     SessionTabComponent,
@@ -24,7 +24,12 @@ type TabName = 'menu' | 'rifles' | 'venues' | 'session' | 'history';
   styleUrls: ['./app.component.css']
 })
 export class AppComponent {
-  // Default tab is the Menu
+  // App identity
+  appTitle = 'Gunstuff - Ballistic Dope Card';
+  appSubtitle = 'Digital log book';
+  appVersion = 'V.01';
+
+  // Tabs
   currentTab: TabName = 'menu';
 
   // Simple state for the Reports mini-wizard on the Menu tab

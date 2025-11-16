@@ -33,7 +33,7 @@ export class SessionTabComponent implements OnInit {
   title = '';
   environment: Environment = {};
 
-  // NEW: wind clock (1–12, relative to 12 o’clock = target)
+  // Wind clock (1–12, relative to 12 o’clock = target)
   windClock: number | null = null;
 
   shotCount: number | null = null;
@@ -102,7 +102,7 @@ export class SessionTabComponent implements OnInit {
     else if (speed < 8) intensity = 'Medium wind – expect noticeable drift.';
     else intensity = 'Strong wind – expect significant drift.';
 
-    return `Wind from ${c} o'clock at ${speed} m/s: expect ${directionText}. ${intensity}`;
+    return `Wind from ${c} o'clock at ${speed} mph: expect ${directionText}. ${intensity}`;
   }
 
   // ---------- Setup step ----------

@@ -90,6 +90,23 @@
 
   <!-- STEP 2: ENVIRONMENT -->
   <div *ngIf="step === 'environment'" class="space-y-3">
+
+    <!-- Kestrel Integration header / future card -->
+    <div class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
+      <h2 class="text-sm font-semibold mb-1">Kestrel integration</h2>
+      <p class="text-[11px] text-gray-300">
+        In a future version you’ll be able to pull temperature, pressure,
+        humidity and wind directly from your Kestrel.
+        For now, enter the environment manually in the section below.
+      </p>
+      <button
+        class="w-full px-3 py-1.5 text-xs rounded bg-gray-700 text-gray-400 cursor-not-allowed"
+        disabled>
+        Connect to Kestrel (coming soon)
+      </button>
+    </div>
+
+    <!-- Manual environment entry -->
     <div class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
       <h2 class="text-sm font-semibold mb-1">Environment (before shooting)</h2>
 
@@ -132,7 +149,7 @@
         </label>
 
         <label class="flex flex-col">
-          Wind speed (m/s)
+          Wind speed (mph)
           <input
             type="number"
             [(ngModel)]="environment.windSpeedMps"

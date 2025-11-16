@@ -33,6 +33,9 @@ export class SessionTabComponent implements OnInit {
   title = '';
   environment: Environment = {};
 
+  // NEW: wind clock (1–12, relative to 12 o’clock = target)
+  windClock: number | null = null;
+
   shotCount: number | null = null;
   selectedDistances: number[] = [];
   notes = '';
@@ -65,6 +68,44 @@ export class SessionTabComponent implements OnInit {
     const sr = this.selectedSubRange;
     return sr?.distancesM ?? [];
   }
+
+  // ---------- Wind hint text ----------
+
+  get windHint(): string {
+    const speed = this.environment.windSpeedMps;
+    let clock = this.windClock;
+    if (!clock || !speed || speed <= 0) return '';
+
+    // Normalize clock to 1..12
+    clock = ((clock - 1) % 12) + 1;
+
+    const c = clock;
+    const isFront = c === 11 || c === 12 || c === 1;
+    const isBack = c === 5 || c === 6 || c === 7;
+    const isRight = c >= 1 && c <= 5;   // wind from right side
+    const isLeft = c >= 7 && c <= 11;   // wind from left side
+
+    let directionText = '';
+
+    if (isFront && isRight) directionText = 'slightly low with drift to the left';
+    else if (isFront && isLeft) directionText = 'slightly low with drift to the right';
+    else if (isFront) directionText = 'slightly low, minimal left/right drift';
+    else if (isBack && isRight) directionText = 'slightly high with drift to the left';
+    else if (isBack && isLeft) directionText = 'slightly high with drift to the right';
+    else if (isBack) directionText = 'slightly high, minimal left/right drift';
+    else if (isRight) directionText = 'drift to the left';
+    else if (isLeft) directionText = 'drift to the right';
+
+    let intensity = '';
+    if (speed < 2) intensity = 'Very light wind – small effect.';
+    else if (speed < 5) intensity = 'Light wind – moderate correction.';
+    else if (speed < 8) intensity = 'Medium wind – expect noticeable drift.';
+    else intensity = 'Strong wind – expect significant drift.';
+
+    return `Wind from ${c} o'clock at ${speed} m/s: expect ${directionText}. ${intensity}`;
+  }
+
+  // ---------- Setup step ----------
 
   onVenueChange() {
     const srs = this.subRanges;
@@ -101,9 +142,23 @@ export class SessionTabComponent implements OnInit {
     this.step = 'environment';
   }
 
+  // ---------- Environment step ----------
+
   nextFromEnvironment() {
+    // Convert windClock -> approximate windDirectionDeg (0° = from target / headwind)
+    if (this.windClock != null) {
+      let c = ((this.windClock - 1) % 12) + 1; // 1..12
+      const fraction = c === 12 ? 0 : c / 12;
+      const deg = Math.round(fraction * 360);
+      this.environment.windDirectionDeg = deg;
+    } else {
+      this.environment.windDirectionDeg = undefined;
+    }
+
     this.step = 'shots';
   }
+
+  // ---------- Shot planning step ----------
 
   toggleDistance(d: number) {
     if (this.selectedDistances.includes(d)) {
@@ -157,7 +212,7 @@ export class SessionTabComponent implements OnInit {
 
     this.data.addSession(sessionToSave);
 
-    // 🔥 increment rifle round count using planned shot count
+    // increment rifle round count using planned shot count (if set)
     if (this.shotCount && this.shotCount > 0) {
       this.data.incrementRifleRoundCount(this.selectedRifleId, this.shotCount);
     }
@@ -166,6 +221,8 @@ export class SessionTabComponent implements OnInit {
       'Session saved to History. Go shoot! After you are done, open the History tab to enter your actual dope.';
     this.step = 'complete';
   }
+
+  // ---------- Navigation ----------
 
   backToSetup() {
     this.step = 'setup';
@@ -182,6 +239,7 @@ export class SessionTabComponent implements OnInit {
     this.selectedVenueId = null;
     this.selectedSubRangeId = null;
     this.environment = {};
+    this.windClock = null;
     this.shotCount = null;
     this.selectedDistances = [];
     this.notes = '';

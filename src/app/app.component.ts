@@ -6,8 +6,9 @@ import { RiflesTabComponent } from './rifles-tab/rifles-tab.component';
 import { VenuesTabComponent } from './venues-tab/venues-tab.component';
 import { SessionTabComponent } from './session-tab/session-tab.component';
 import { HistoryTabComponent } from './history-tab/history-tab.component';
+import { LoadDevTabComponent } from './load-dev-tab/load-dev-tab.component';
 
-type TabName = 'menu' | 'rifles' | 'venues' | 'session' | 'history';
+type TabName = 'menu' | 'rifles' | 'venues' | 'session' | 'history' | 'loaddev';
 
 @Component({
   selector: 'app-root',
@@ -18,7 +19,8 @@ type TabName = 'menu' | 'rifles' | 'venues' | 'session' | 'history';
     RiflesTabComponent,
     VenuesTabComponent,
     SessionTabComponent,
-    HistoryTabComponent
+    HistoryTabComponent,
+    LoadDevTabComponent
   ],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
@@ -49,15 +51,16 @@ export class AppComponent {
 
   // MENU actions
   startEvent() {
-    // Jump straight to the Session wizard tab
     this.setTab('session');
   }
 
+  openLoadDevelopment() {
+    this.setTab('loaddev');
+  }
+
   showLoadDevelopmentInfo() {
-    alert(
-      'Load Development is a planned future feature.\n\n' +
-      'Here you will be able to record ladder tests, OCW, and compare groups for different loads.'
-    );
+    // fallback if we ever want to keep info popup, but now we navigate directly
+    this.setTab('loaddev');
   }
 
   openReports() {

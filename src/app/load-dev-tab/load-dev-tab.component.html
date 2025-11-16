@@ -1,0 +1,345 @@
+<div class="space-y-3 text-xs">
+
+  <!-- Rifle selection -->
+  <div class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
+    <h2 class="text-sm font-semibold mb-1">Load development</h2>
+
+    <label class="flex flex-col">
+      Rifle
+      <select
+        [(ngModel)]="selectedRifleId"
+        name="rifle"
+        (ngModelChange)="onRifleChange()"
+        class="mt-1 px-2 py-1 rounded bg-black border border-gray-700">
+        <option [ngValue]="null">Select rifle</option>
+        <option *ngFor="let r of rifles" [ngValue]="r.id">
+          {{ r.name }} ({{ r.caliber }})
+        </option>
+      </select>
+      <span *ngIf="rifles.length === 0" class="text-[10px] text-orange-400 mt-1">
+        No rifles saved yet. Add one on the Rifles tab.
+      </span>
+    </label>
+
+    <div class="flex justify-between items-center mt-2">
+      <span class="text-[11px] text-gray-300">
+        Projects for this rifle: {{ projects.length }}
+      </span>
+      <button
+        class="px-3 py-1 text-[11px] rounded bg-orange-500 text-black font-semibold"
+        (click)="newProject()"
+        [disabled]="!selectedRifleId">
+        New project
+      </button>
+    </div>
+  </div>
+
+  <!-- Project list -->
+  <div class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
+    <h3 class="text-xs font-semibold mb-1">Projects</h3>
+
+    <div *ngIf="!selectedRifleId" class="text-[11px] text-gray-400">
+      Select a rifle to see its load development projects.
+    </div>
+
+    <div *ngIf="selectedRifleId && projects.length === 0" class="text-[11px] text-gray-400">
+      No projects yet for this rifle. Tap <strong>New project</strong> to start a ladder,
+      OCW or group comparison.
+    </div>
+
+    <div
+      *ngFor="let p of projects"
+      class="bg-black rounded-lg p-2 mt-1 flex flex-col gap-1 border"
+      [ngClass]="p.id === selectedProjectId ? 'border-orange-500' : 'border-gray-700'">
+
+      <div class="flex justify-between items-start">
+        <div>
+          <div class="text-[12px] font-semibold">
+            {{ p.name }}
+          </div>
+          <div class="text-[10px] text-gray-300">
+            {{ projectTypeLabel(p.type) }} • {{ shortDate(p.dateStarted) }}
+          </div>
+          <div class="text-[10px] text-gray-400" *ngIf="p.entries.length > 0">
+            {{ p.entries.length }} test {{ p.entries.length === 1 ? 'entry' : 'entries' }}
+          </div>
+        </div>
+        <div class="flex gap-2 text-[10px]">
+          <button
+            class="px-2 py-1 rounded bg-gray-700"
+            (click)="openProject(p)">
+            Open
+          </button>
+          <button
+            class="px-2 py-1 rounded bg-red-600"
+            (click)="deleteProject(p)">
+            Delete
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="p.id === selectedProjectId && bestEntryForSelectedProject" class="text-[10px] text-orange-400 mt-1">
+        Best group so far:
+        {{ bestEntryForSelectedProject?.loadLabel }}
+        ({{ bestEntryForSelectedProject?.groupSize }} {{ bestEntryForSelectedProject?.groupUnit || 'MOA' }})
+      </div>
+    </div>
+  </div>
+
+  <!-- Project form -->
+  <div *ngIf="projectFormVisible" class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
+    <h3 class="text-xs font-semibold mb-1">
+      {{ editingProject ? 'Edit project' : 'New project' }}
+    </h3>
+
+    <label class="flex flex-col">
+      Rifle
+      <select
+        [(ngModel)]="projectForm.rifleId"
+        name="projectRifle"
+        class="mt-1 px-2 py-1 rounded bg-black border border-gray-700">
+        <option [ngValue]="null">Select rifle</option>
+        <option *ngFor="let r of rifles" [ngValue]="r.id">
+          {{ r.name }} ({{ r.caliber }})
+        </option>
+      </select>
+    </label>
+
+    <label class="flex flex-col">
+      Project name
+      <input
+        [(ngModel)]="projectForm.name"
+        name="projectName"
+        placeholder="e.g. N570 6.5 CM ladder 2025-01"
+        class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+    </label>
+
+    <label class="flex flex-col">
+      Type
+      <select
+        [(ngModel)]="projectForm.type"
+        name="projectType"
+        class="mt-1 px-2 py-1 rounded bg-black border border-gray-700">
+        <option value="ladder">Ladder test</option>
+        <option value="ocw">OCW</option>
+        <option value="groups">Group comparison</option>
+      </select>
+    </label>
+
+    <label class="flex flex-col">
+      Notes (optional)
+      <textarea
+        [(ngModel)]="projectForm.notes"
+        name="projectNotes"
+        rows="2"
+        class="mt-1 px-2 py-1 rounded bg-black border border-gray-700"></textarea>
+    </label>
+
+    <div class="flex justify-end gap-2 mt-2">
+      <button
+        class="px-3 py-1 text-[11px] rounded bg-gray-700"
+        (click)="cancelProjectForm()">
+        Cancel
+      </button>
+      <button
+        class="px-3 py-1 text-[11px] rounded bg-orange-500 text-black font-semibold"
+        (click)="saveProject()">
+        Save project
+      </button>
+    </div>
+  </div>
+
+  <!-- Project detail + entries -->
+  <div *ngIf="selectedProject" class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
+    <div class="flex justify-between items-start">
+      <div>
+        <div class="text-sm font-semibold">
+          {{ selectedProject.name }}
+        </div>
+        <div class="text-[10px] text-gray-300">
+          {{ projectTypeLabel(selectedProject.type) }} • {{ shortDate(selectedProject.dateStarted) }}
+        </div>
+        <div class="text-[10px] text-gray-400" *ngIf="selectedRifle">
+          Rifle: {{ selectedRifle?.name }} ({{ selectedRifle?.caliber }})
+        </div>
+      </div>
+      <button
+        class="px-2 py-1 text-[10px] rounded bg-gray-700"
+        (click)="newEntry()">
+        Add entry
+      </button>
+    </div>
+
+    <div *ngIf="selectedProject.entries.length === 0" class="text-[11px] text-gray-400">
+      No entries yet. Add your first ladder step, OCW charge, or test group.
+    </div>
+
+    <div
+      *ngFor="let e of selectedProject.entries"
+      class="bg-black rounded-lg p-2 mt-1 border border-gray-700 flex justify-between items-start gap-2">
+      <div class="text-[11px]">
+        <div class="font-semibold">
+          {{ e.loadLabel }}
+        </div>
+        <div class="text-[10px] text-gray-300">
+          {{ entrySummary(e) }}
+        </div>
+        <div *ngIf="e.poiNote" class="text-[10px] text-gray-400">
+          POI: {{ e.poiNote }}
+        </div>
+        <div *ngIf="e.notes" class="text-[10px] text-gray-400">
+          Notes: {{ e.notes }}
+        </div>
+      </div>
+      <div class="flex flex-col gap-1 text-[10px]">
+        <button
+          class="px-2 py-1 rounded bg-gray-700"
+          (click)="editEntry(e)">
+          Edit
+        </button>
+        <button
+          class="px-2 py-1 rounded bg-red-600"
+          (click)="deleteEntry(e)">
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Entry form -->
+  <div *ngIf="entryFormVisible" class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
+    <h3 class="text-xs font-semibold mb-1">
+      {{ editingEntry ? 'Edit entry' : 'New entry' }}
+    </h3>
+
+    <label class="flex flex-col">
+      Load label
+      <input
+        [(ngModel)]="entryForm.loadLabel"
+        name="entryLoadLabel"
+        placeholder="e.g. 42.3 gr N570 / 140 ELD-M / 2.810"
+        class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+    </label>
+
+    <div class="grid grid-cols-2 gap-2">
+      <label class="flex flex-col">
+        Powder
+        <input
+          [(ngModel)]="entryForm.powder"
+          name="entryPowder"
+          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Charge (gr)
+        <input
+          type="number"
+          [(ngModel)]="entryForm.chargeGr"
+          name="entryCharge"
+          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+      </label>
+
+      <label class="flex flex-col">
+        COAL
+        <input
+          [(ngModel)]="entryForm.coal"
+          name="entryCoal"
+          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Primer
+        <input
+          [(ngModel)]="entryForm.primer"
+          name="entryPrimer"
+          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Bullet
+        <input
+          [(ngModel)]="entryForm.bullet"
+          name="entryBullet"
+          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Bullet weight (gr)
+        <input
+          type="number"
+          [(ngModel)]="entryForm.bulletWeightGr"
+          name="entryBulletWeight"
+          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Distance (m)
+        <input
+          type="number"
+          [(ngModel)]="entryForm.distanceM"
+          name="entryDistance"
+          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Shots fired
+        <input
+          type="number"
+          [(ngModel)]="entryForm.shotsFired"
+          name="entryShots"
+          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Group size
+        <input
+          type="number"
+          [(ngModel)]="entryForm.groupSize"
+          name="entryGroupSize"
+          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+      </label>
+
+      <label class="flex flex-col">
+        Unit
+        <select
+          [(ngModel)]="entryForm.groupUnit"
+          name="entryGroupUnit"
+          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700">
+          <option value="MOA">MOA</option>
+          <option value="mm">mm</option>
+        </select>
+      </label>
+    </div>
+
+    <label class="flex flex-col">
+      POI relative to aim
+      <input
+        [(ngModel)]="entryForm.poiNote"
+        name="entryPoi"
+        placeholder="e.g. 0.2 mil high, 0.1 mil right"
+        class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+    </label>
+
+    <label class="flex flex-col">
+      Notes
+      <textarea
+        [(ngModel)]="entryForm.notes"
+        name="entryNotes"
+        rows="2"
+        class="mt-1 px-2 py-1 rounded bg-black border border-gray-700"></textarea>
+    </label>
+
+    <div class="flex justify-end gap-2 mt-2">
+      <button
+        class="px-3 py-1 text-[11px] rounded bg-gray-700"
+        (click)="cancelEntryForm()">
+        Cancel
+      </button>
+      <button
+        class="px-3 py-1 text-[11px] rounded bg-orange-500 text-black font-semibold"
+        (click)="saveEntry()">
+        Save entry
+      </button>
+    </div>
+  </div>
+</div>

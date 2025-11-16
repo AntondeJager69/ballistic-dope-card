@@ -21,7 +21,7 @@ export interface Rifle {
   bulletWeightGr: number | null;
   bulletName: string;
   notes?: string;
-  roundCount?: number;       // 🔥 total rounds through this rifle
+  roundCount?: number;       // total rounds through this rifle
   loads: RifleLoad[];
 }
 
@@ -45,8 +45,8 @@ export interface Environment {
   pressureHpa?: number;
   humidityPercent?: number;
   densityAltitudeM?: number;
-  windSpeedMps?: number;
-  windDirectionDeg?: number;
+  windSpeedMps?: number;        // currently used as mph in UI
+  windDirectionDeg?: number;    // derived from wind clock
   lightConditions?: string;
 }
 
@@ -56,7 +56,6 @@ export interface DistanceDope {
   elevationMil?: number;
   windageMil?: number;
   impactsDescription?: string;
-  // (clicks/group MOA were removed in your last change)
 }
 
 export interface Session {
@@ -69,4 +68,40 @@ export interface Session {
   dope: DistanceDope[];
   notes?: string;
   completed?: boolean;
+}
+
+/* ============================
+   Load development models
+   ============================ */
+
+export type LoadDevType = 'ladder' | 'ocw' | 'groups';
+
+export type GroupSizeUnit = 'MOA' | 'mm';
+
+export interface LoadDevEntry {
+  id: number;
+  // Nest inside project, no need for projectId field here
+  loadLabel: string;         // e.g. "42.3 gr N570 / 140 ELD-M / 2.810"
+  powder?: string;
+  chargeGr?: number;
+  coal?: string;
+  primer?: string;
+  bullet?: string;
+  bulletWeightGr?: number;
+  distanceM?: number;
+  shotsFired?: number;
+  groupSize?: number;
+  groupUnit?: GroupSizeUnit;
+  poiNote?: string;          // POI relative to aim, free text
+  notes?: string;
+}
+
+export interface LoadDevProject {
+  id: number;
+  rifleId: number;
+  name: string;              // "N570 6.5 CM ladder 2025-01"
+  type: LoadDevType;
+  dateStarted: string;       // ISO string
+  notes?: string;
+  entries: LoadDevEntry[];
 }

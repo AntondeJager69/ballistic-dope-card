@@ -52,11 +52,15 @@ export class SessionTabComponent implements OnInit {
   dopeRows: DistanceDope[] = [];
   completeMessage = '';
 
-  // Kestrel integration state
-  kestrelConnected = false;
-  kestrelStatus = 'Not connected';
-  kestrelLastUpdate: Date | null = null;
-  kestrelData: KestrelSnapshot | null = null;
+
+// Kestrel integration state
+kestrelConnected = false;
+kestrelStatus = 'Not connected';
+kestrelLastUpdate: Date | null = null;
+kestrelData: KestrelSnapshot | null = null;
+kestrelError: string | null = null;
+kestrelIsConnecting = false;
+
 
   constructor(private data: DataService) {}
 
@@ -183,6 +187,93 @@ export class SessionTabComponent implements OnInit {
     this.environment.windSpeedMps = mock.windSpeedMph; // using mph in UI
     this.windClock = mock.windClock;
   }
+// Real Kestrel Bluetooth connection (experimental)
+async connectKestrelBluetooth(): Promise<void> {
+  this.kestrelError = null;
+  this.kestrelIsConnecting = true;
+  this.kestrelStatus = 'Opening Bluetooth device chooser…';
+
+  try {
+    const navAny = navigator as any;
+    if (!navAny.bluetooth) {
+      throw new Error('Web Bluetooth is not supported in this browser.');
+    }
+
+    // NK Kestrel custom service & Sensor Measurements characteristic
+    // Built from the custom UUID base in the LiNK doc + table UUIDs 0x0000 (service) and 0x0310 (Sensor Measurements). 
+    const kestrelServiceUuid = 'db743802-ec44-4eb2-a1de-b4ea00002903';
+    const sensorMeasurementsUuid = 'db743802-ec44-4eb2-a1de-b4ea10032903';
+
+    const device = await navAny.bluetooth.requestDevice({
+      filters: [
+        { namePrefix: 'K5' },      // K5000 / 5700 etc.
+        { namePrefix: 'K7' },      // other series
+        { namePrefix: 'Kestrel' }  // generic
+      ],
+      optionalServices: [kestrelServiceUuid]
+    });
+
+    this.kestrelStatus = `Connecting to ${device.name || 'device'}…`;
+
+    const server = await device.gatt!.connect();
+    const service = await server.getPrimaryService(kestrelServiceUuid);
+    const sensorChar = await service.getCharacteristic(sensorMeasurementsUuid);
+
+    const value: DataView = await sensorChar.readValue();
+    const dv = value;
+
+    // ⚠️ Byte layout is based on the "Measurement Details" table from the Weather Protocol:
+    // wind speed, temp, humidity, pressure each 2 bytes, metric, 0.1 resolution. 
+    // This is a best guess for ordering. If values look wrong, we can adjust offsets.
+    const windRaw = dv.getUint16(0, true);     // m/s * 10
+    const tempRaw = dv.getInt16(2, true);      // °C * 10
+    const rhRaw = dv.getUint16(4, true);       // % * 10
+    const pressureRaw = dv.getUint16(6, true); // hPa * 10
+
+    const windMs = windRaw / 10;
+    const windMph = windMs * 2.23694;
+    const tempC = tempRaw / 10;
+    const humidity = rhRaw / 10;
+    const pressureHpa = pressureRaw / 10;
+
+    console.log('Kestrel SensorMeasurements raw (first 8 bytes):', {
+      windRaw,
+      tempRaw,
+      rhRaw,
+      pressureRaw
+    });
+
+    // Push into environment model
+    this.environment.temperatureC = tempC;
+    this.environment.humidityPercent = humidity;
+    this.environment.pressureHpa = pressureHpa;
+    this.environment.windSpeedMps = parseFloat(windMph.toFixed(1)); // using mph here
+
+    // Update snapshot object for display
+    this.kestrelData = {
+      temperatureC: tempC,
+      humidityPercent: humidity,
+      pressureHpa,
+      densityAltitudeM: this.environment.densityAltitudeM ?? 0,
+      windSpeedMph: parseFloat(windMph.toFixed(1)),
+      windClock: this.windClock ?? 12
+    };
+
+    this.kestrelConnected = true;
+    this.kestrelLastUpdate = new Date();
+    this.kestrelStatus = `Connected to ${device.name || 'Kestrel'} and imported data.`;
+  } catch (err: any) {
+    if (err && err.name === 'NotFoundError') {
+      this.kestrelStatus = 'Bluetooth device picker was closed.';
+    } else {
+      console.error('Kestrel Bluetooth error:', err);
+      this.kestrelStatus = 'Kestrel connection failed.';
+      this.kestrelError = err?.message || String(err);
+    }
+  } finally {
+    this.kestrelIsConnecting = false;
+  }
+}
 
   // ---------- Environment step ----------
 

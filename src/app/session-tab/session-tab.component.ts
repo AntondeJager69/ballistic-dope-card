@@ -13,6 +13,15 @@ import {
 
 type WizardStep = 'setup' | 'environment' | 'shots' | 'complete';
 
+interface KestrelSnapshot {
+  temperatureC: number;
+  humidityPercent: number;
+  pressureHpa: number;
+  densityAltitudeM: number;
+  windSpeedMph: number;
+  windClock: number; // 1–12
+}
+
 @Component({
   selector: 'app-session-tab',
   standalone: true,
@@ -33,7 +42,7 @@ export class SessionTabComponent implements OnInit {
   title = '';
   environment: Environment = {};
 
-  // Wind clock (1–12, relative to 12 o’clock = target)
+  // Wind clock (1–12, relative to target at 12)
   windClock: number | null = null;
 
   shotCount: number | null = null;
@@ -43,12 +52,20 @@ export class SessionTabComponent implements OnInit {
   dopeRows: DistanceDope[] = [];
   completeMessage = '';
 
+  // Kestrel integration state
+  kestrelConnected = false;
+  kestrelStatus = 'Not connected';
+  kestrelLastUpdate: Date | null = null;
+  kestrelData: KestrelSnapshot | null = null;
+
   constructor(private data: DataService) {}
 
   ngOnInit(): void {
     this.rifles = this.data.getRifles();
     this.venues = this.data.getVenues();
   }
+
+  // ---------- Derived getters ----------
 
   get selectedVenue(): Venue | undefined {
     return this.venues.find(v => v.id === this.selectedVenueId);
@@ -68,8 +85,6 @@ export class SessionTabComponent implements OnInit {
     const sr = this.selectedSubRange;
     return sr?.distancesM ?? [];
   }
-
-  // ---------- Wind hint text ----------
 
   get windHint(): string {
     const speed = this.environment.windSpeedMps;
@@ -140,6 +155,33 @@ export class SessionTabComponent implements OnInit {
     }
 
     this.step = 'environment';
+  }
+
+  // ---------- Kestrel integration (mock for now) ----------
+
+  mockReadFromKestrel(): void {
+    // Simulated Kestrel snapshot (later replace with real Bluetooth read)
+    const mock: KestrelSnapshot = {
+      temperatureC: 23.7,
+      humidityPercent: 38,
+      pressureHpa: 1011.5,
+      densityAltitudeM: 1350,
+      windSpeedMph: 6.5,
+      windClock: 3 // wind from right
+    };
+
+    this.kestrelData = mock;
+    this.kestrelConnected = true;
+    this.kestrelLastUpdate = new Date();
+    this.kestrelStatus = 'Mock Kestrel data loaded';
+
+    // Push mock values into environment fields
+    this.environment.temperatureC = mock.temperatureC;
+    this.environment.humidityPercent = mock.humidityPercent;
+    this.environment.pressureHpa = mock.pressureHpa;
+    this.environment.densityAltitudeM = mock.densityAltitudeM;
+    this.environment.windSpeedMps = mock.windSpeedMph; // using mph in UI
+    this.windClock = mock.windClock;
   }
 
   // ---------- Environment step ----------
@@ -245,6 +287,12 @@ export class SessionTabComponent implements OnInit {
     this.notes = '';
     this.dopeRows = [];
     this.completeMessage = '';
+
+    this.kestrelConnected = false;
+    this.kestrelStatus = 'Not connected';
+    this.kestrelLastUpdate = null;
+    this.kestrelData = null;
+
     this.rifles = this.data.getRifles();
     this.venues = this.data.getVenues();
   }

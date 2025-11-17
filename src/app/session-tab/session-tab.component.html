@@ -91,19 +91,64 @@
   <!-- STEP 2: ENVIRONMENT -->
   <div *ngIf="step === 'environment'" class="space-y-3">
 
-    <!-- Kestrel Integration header / future card -->
-    <div class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
-      <h2 class="text-sm font-semibold mb-1">Kestrel integration</h2>
-      <p class="text-[11px] text-gray-300">
-        In a future version you’ll be able to pull temperature, pressure,
-        humidity and wind directly from your Kestrel.
-        For now, enter the environment manually in the section below.
+    <!-- Kestrel Integration -->
+    <div class="bg-slate-800/80 rounded-2xl p-3 border border-slate-700 shadow-sm">
+      <div class="flex items-center justify-between mb-2">
+        <div>
+          <h3 class="text-sm font-semibold text-orange-400 tracking-wide">
+            Kestrel integration
+          </h3>
+          <p class="text-[11px] text-slate-300/80">
+            Optionally pull environmentals from a Kestrel (mocked for now).
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="px-3 py-1.5 text-xs font-semibold rounded-full bg-orange-500 hover:bg-orange-400 text-slate-900 shadow-sm transition"
+          (click)="mockReadFromKestrel()">
+          Connect &amp; read
+        </button>
+      </div>
+
+      <p class="text-[11px] text-slate-300 mb-1">
+        Status:
+        <span
+          class="font-medium"
+          [ngClass]="{
+            'text-green-400': kestrelConnected,
+            'text-slate-200': !kestrelConnected
+          }">
+          {{ kestrelStatus }}
+        </span>
       </p>
-      <button
-        class="w-full px-3 py-1.5 text-xs rounded bg-gray-700 text-gray-400 cursor-not-allowed"
-        disabled>
-        Connect to Kestrel (coming soon)
-      </button>
+
+      <p *ngIf="kestrelLastUpdate" class="text-[10px] text-slate-400 mb-2">
+        Last update: {{ kestrelLastUpdate | date:'short' }}
+      </p>
+
+      <div *ngIf="kestrelData" class="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-100">
+        <div class="bg-slate-900/70 rounded-lg px-2 py-1.5">
+          <div class="text-[10px] text-slate-400 uppercase tracking-wide">Temp</div>
+          <div class="font-semibold">{{ kestrelData.temperatureC }} °C</div>
+        </div>
+        <div class="bg-slate-900/70 rounded-lg px-2 py-1.5">
+          <div class="text-[10px] text-slate-400 uppercase tracking-wide">Humidity</div>
+          <div class="font-semibold">{{ kestrelData.humidityPercent }} %</div>
+        </div>
+        <div class="bg-slate-900/70 rounded-lg px-2 py-1.5">
+          <div class="text-[10px] text-slate-400 uppercase tracking-wide">Pressure</div>
+          <div class="font-semibold">{{ kestrelData.pressureHpa }} hPa</div>
+        </div>
+        <div class="bg-slate-900/70 rounded-lg px-2 py-1.5">
+          <div class="text-[10px] text-slate-400 uppercase tracking-wide">Density Alt</div>
+          <div class="font-semibold">{{ kestrelData.densityAltitudeM }} m</div>
+        </div>
+      </div>
+
+      <p class="mt-2 text-[10px] text-slate-400">
+        Later we’ll replace this mock with real Kestrel LiNK / Weather Protocol integration.
+      </p>
     </div>
 
     <!-- Manual environment entry -->

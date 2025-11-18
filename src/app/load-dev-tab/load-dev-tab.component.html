@@ -161,7 +161,7 @@
         (click)="newEntry()">Add entry</button>
     </div>
 
-    <!-- DESCRIPTIONS (Option B) -->
+    <!-- DESCRIPTIONS -->
     <div *ngIf="selectedProject.type === 'ladder'"
       class="text-[10px] text-gray-200 bg-black/70 border border-gray-700 rounded p-2 space-y-1">
       <div class="font-semibold text-orange-300">Ladder Test</div>
@@ -182,191 +182,204 @@
       </ul>
     </div>
 
-    <!-- PLANNER -->
-    <div *ngIf="isPlannerVisible"
-      class="mt-1 rounded bg-black/80 border border-gray-700 p-2 space-y-2">
-
-      <div class="flex justify-between items-center">
-        <div class="text-[11px] font-semibold text-gray-100">
-          Plan {{ projectTypeLabel(selectedProject.type) }} series
+    <!-- RESULTS PANEL (collapsible via <details>) -->
+    <details class="mt-1 rounded-xl bg-black/80 border border-gray-700" open>
+      <summary class="flex justify-between items-center px-2 py-1 text-[11px] cursor-pointer">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-0.5 text-left">
+          <span class="font-semibold text-gray-100">
+            Current {{ projectTypeLabel(selectedProject.type) }} results
+          </span>
+          <span class="text-[10px] text-gray-300 sm:ml-2">
+            Entries: {{ selectedProject.entries.length }}
+          </span>
+          <span
+            *ngIf="selectedProject.entries.length > 0"
+            class="text-[9px] text-gray-400 sm:ml-2">
+            <ng-container *ngIf="selectedProject.entries[0] as e">
+              <ng-container *ngIf="e.powder">{{ e.powder }}</ng-container>
+              <ng-container *ngIf="e.bulletWeightGr || e.bullet">
+                • {{ e.bulletWeightGr ? e.bulletWeightGr + ' gr ' : '' }}{{ e.bullet }}
+              </ng-container>
+              <ng-container *ngIf="e.distanceM">
+                • {{ e.distanceM }} m
+              </ng-container>
+            </ng-container>
+          </span>
         </div>
-        <button class="px-2 py-0.5 text-[10px] rounded bg-gray-700"
-          (click)="resetPlannerForProject()">Reset</button>
-      </div>
+        <span class="text-[11px] text-gray-300">
+          ▼
+        </span>
+      </summary>
 
-      <div class="grid grid-cols-3 gap-2">
-        <label class="flex flex-col">
-          <span class="mb-0.5">Start (gr)</span>
-          <input type="number" [(ngModel)]="planner.startChargeGr"
-            class="px-2 py-1 rounded bg-black border border-gray-700" />
-        </label>
-        <label class="flex flex-col">
-          <span class="mb-0.5">End (gr)</span>
-          <input type="number" [(ngModel)]="planner.endChargeGr"
-            class="px-2 py-1 rounded bg-black border border-gray-700" />
-        </label>
-        <label class="flex flex-col">
-          <span class="mb-0.5">Step (gr)</span>
-          <input type="number" [(ngModel)]="planner.stepGr"
-            class="px-2 py-1 rounded bg-black border border-gray-700" />
-        </label>
-      </div>
-
-      <div class="grid grid-cols-2 gap-2 mt-1">
-        <label class="flex flex-col">
-          <span class="mb-0.5">Powder</span>
-          <input [(ngModel)]="planner.powder"
-            class="px-2 py-1 rounded bg-black border border-gray-700" />
-        </label>
-        <label class="flex flex-col">
-          <span class="mb-0.5">Shots/step</span>
-          <input type="number" [(ngModel)]="planner.shotsPerStep"
-            class="px-2 py-1 rounded bg-black border border-gray-700" />
-        </label>
-        <label class="flex flex-col">
-          <span class="mb-0.5">Bullet</span>
-          <input [(ngModel)]="planner.bullet"
-            placeholder="e.g. 140 ELD-M"
-            class="px-2 py-1 rounded bg-black border border-gray-700" />
-        </label>
-        <label class="flex flex-col">
-          <span class="mb-0.5">Bullet weight</span>
-          <input type="number" [(ngModel)]="planner.bulletWeightGr"
-            class="px-2 py-1 rounded bg-black border border-gray-700" />
-        </label>
-        <label class="flex flex-col">
-          <span class="mb-0.5">COAL</span>
-          <input [(ngModel)]="planner.coal"
-            class="px-2 py-1 rounded bg-black border border-gray-700" />
-        </label>
-        <label class="flex flex-col">
-          <span class="mb-0.5">Primer</span>
-          <input [(ngModel)]="planner.primer"
-            class="px-2 py-1 rounded bg-black border border-gray-700" />
-        </label>
-        <label class="flex flex-col">
-          <span class="mb-0.5">Distance (m)</span>
-          <input type="number" [(ngModel)]="planner.distanceM"
-            class="px-2 py-1 rounded bg-black border border-gray-700" />
-        </label>
-      </div>
-
-      <div class="flex justify-between items-center mt-1 text-[10px] text-gray-300">
-        <span>Creates one entry per charge step.</span>
-        <button
-          class="px-3 py-1 text-[10px] rounded bg-orange-500 text-black font-semibold"
-          (click)="generateSeriesFromPlanner()">
-          Generate loads
-        </button>
-      </div>
-    </div>
-
-    <!-- Entries header + summary line -->
-    <div class="flex items-center justify-between mt-2 text-[10px] text-gray-300">
-      <div class="flex flex-col sm:flex-row sm:items-center gap-0.5">
-        <div>
-          Entries: {{ selectedProject.entries.length }}
+      <div class="px-2 pb-2 pt-1">
+        <div class="flex items-center justify-end mb-1 text-[10px] text-gray-300">
+          <div class="flex items-center gap-1">
+            <span>Sort</span>
+            <select [(ngModel)]="entrySortMode"
+              class="px-1 py-0.5 rounded bg-black border border-gray-700 text-[10px]">
+              <option value="chargeAsc">Charge ↑</option>
+              <option value="groupAsc">Group ↑</option>
+              <option value="groupDesc">Group ↓</option>
+              <option value="default">Order</option>
+            </select>
+          </div>
         </div>
-        <!-- One-line recipe summary from first entry -->
-        <div
-          *ngIf="selectedProject.entries.length > 0"
-          class="text-[9px] text-gray-400 sm:ml-2">
-          <ng-container *ngIf="selectedProject.entries[0] as e">
-            <ng-container *ngIf="e.powder">
-              {{ e.powder }}
-            </ng-container>
-            <ng-container *ngIf="e.bulletWeightGr || e.bullet">
-              • {{ e.bulletWeightGr ? e.bulletWeightGr + ' gr ' : '' }}{{ e.bullet }}
-            </ng-container>
-            <ng-container *ngIf="e.distanceM">
-              • {{ e.distanceM }} m
-            </ng-container>
-          </ng-container>
+
+        <div *ngIf="selectedProject.entries.length > 0; else noEntriesBlock" class="overflow-x-auto">
+          <table class="min-w-full text-[10px] border-collapse">
+            <thead>
+              <tr class="bg-black border-b border-gray-700">
+                <th class="px-2 py-1 text-left font-semibold">Charge</th>
+                <th class="px-2 py-1 text-left font-semibold">Shots</th>
+                <th class="px-2 py-1 text-left font-semibold">v̄</th>
+                <th class="px-2 py-1 text-left font-semibold">ES</th>
+                <th class="px-2 py-1 text-left font-semibold">SD</th>
+                <th class="px-2 py-1"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                *ngFor="let e of entriesForSelectedProject"
+                [ngClass]="bestEntryForSelectedProject && e.id === bestEntryForSelectedProject.id
+                  ? 'bg-orange-900/40 border-b border-orange-600'
+                  : 'bg-black border-b border-gray-800'">
+
+                <!-- Charge -->
+                <td class="px-2 py-1">
+                  {{ e.chargeGr != null ? e.chargeGr : '-' }}
+                </td>
+
+                <!-- Shots -->
+                <td class="px-2 py-1">
+                  {{ e.shotsFired != null ? e.shotsFired : '-' }}
+                </td>
+
+                <!-- Stats -->
+                <ng-container *ngIf="statsForEntry(e) as s; else noStats">
+                  <td class="px-2 py-1">
+                    {{ s.avg }}
+                  </td>
+                  <td class="px-2 py-1">
+                    {{ s.es }}
+                  </td>
+                  <td class="px-2 py-1">
+                    {{ s.sd }}
+                  </td>
+                </ng-container>
+                <ng-template #noStats>
+                  <td class="px-2 py-1">-</td>
+                  <td class="px-2 py-1">-</td>
+                  <td class="px-2 py-1">-</td>
+                </ng-template>
+
+                <!-- Actions -->
+                <td class="px-2 py-1 whitespace-nowrap">
+                  <div class="flex gap-1">
+                    <button class="px-1 py-0.5 text-[9px] rounded bg-gray-700" (click)="editEntry(e)">
+                      Edit
+                    </button>
+                    <button class="px-1 py-0.5 text-[9px] rounded bg-gray-700" (click)="duplicateEntry(e)">
+                      Copy
+                    </button>
+                    <button class="px-1 py-0.5 text-[9px] rounded bg-red-600" (click)="deleteEntry(e)">
+                      Del
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <ng-template #noEntriesBlock>
+          <div class="text-[11px] text-gray-400 mt-1">
+            No entries yet. Once you have data, results will appear here.
+          </div>
+        </ng-template>
+      </div>
+    </details>
+
+    <!-- PLANNER PANEL (still separate, can later also be details if you like) -->
+    <div *ngIf="isPlannerVisible" class="mt-2 rounded-xl bg-black/80 border border-gray-700">
+      <button
+        type="button"
+        class="w-full flex justify-between items-center px-2 py-1 text-[11px]"
+        (click)="plannerPanelOpen = !plannerPanelOpen">
+        <span class="font-semibold text-gray-100">
+          Plan new {{ projectTypeLabel(selectedProject.type) }} series
+        </span>
+        <span class="text-[11px] text-gray-300">
+          {{ plannerPanelOpen ? '▲' : '▼' }}
+        </span>
+      </button>
+
+      <div *ngIf="plannerPanelOpen" class="px-2 pb-2 pt-1 space-y-2">
+        <div class="grid grid-cols-3 gap-2">
+          <label class="flex flex-col">
+            <span class="mb-0.5">Start (gr)</span>
+            <input type="number" [(ngModel)]="planner.startChargeGr"
+              class="px-2 py-1 rounded bg-black border border-gray-700" />
+          </label>
+          <label class="flex flex-col">
+            <span class="mb-0.5">End (gr)</span>
+            <input type="number" [(ngModel)]="planner.endChargeGr"
+              class="px-2 py-1 rounded bg-black border border-gray-700" />
+          </label>
+          <label class="flex flex-col">
+            <span class="mb-0.5">Step (gr)</span>
+            <input type="number" [(ngModel)]="planner.stepGr"
+              class="px-2 py-1 rounded bg-black border border-gray-700" />
+          </label>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <label class="flex flex-col">
+            <span class="mb-0.5">Powder</span>
+            <input [(ngModel)]="planner.powder"
+              class="px-2 py-1 rounded bg-black border border-gray-700" />
+          </label>
+          <label class="flex flex-col">
+            <span class="mb-0.5">Shots/step</span>
+            <input type="number" [(ngModel)]="planner.shotsPerStep"
+              class="px-2 py-1 rounded bg-black border border-gray-700" />
+          </label>
+          <label class="flex flex-col">
+            <span class="mb-0.5">Bullet</span>
+            <input [(ngModel)]="planner.bullet"
+              placeholder="e.g. 140 ELD-M"
+              class="px-2 py-1 rounded bg-black border border-gray-700" />
+          </label>
+          <label class="flex flex-col">
+            <span class="mb-0.5">Bullet weight</span>
+            <input type="number" [(ngModel)]="planner.bulletWeightGr"
+              class="px-2 py-1 rounded bg-black border border-gray-700" />
+          </label>
+          <label class="flex flex-col">
+            <span class="mb-0.5">COAL</span>
+            <input [(ngModel)]="planner.coal"
+              class="px-2 py-1 rounded bg-black border border-gray-700" />
+          </label>
+          <label class="flex flex-col">
+            <span class="mb-0.5">Primer</span>
+            <input [(ngModel)]="planner.primer"
+              class="px-2 py-1 rounded bg-black border border-gray-700" />
+          </label>
+          <label class="flex flex-col">
+            <span class="mb-0.5">Distance (m)</span>
+            <input type="number" [(ngModel)]="planner.distanceM"
+              class="px-2 py-1 rounded bg-black border border-gray-700" />
+          </label>
+        </div>
+
+        <div class="flex justify-between items-center mt-1 text-[10px] text-gray-300">
+          <span>Creates one entry per charge step.</span>
+          <button
+            class="px-3 py-1 text-[10px] rounded bg-orange-500 text-black font-semibold"
+            (click)="generateSeriesFromPlanner()">
+            Generate loads
+          </button>
         </div>
       </div>
-      <div class="flex items-center gap-1">
-        <span>Sort</span>
-        <select [(ngModel)]="entrySortMode"
-          class="px-1 py-0.5 rounded bg-black border border-gray-700 text-[10px]">
-          <option value="chargeAsc">Charge ↑</option>
-          <option value="groupAsc">Group ↑</option>
-          <option value="groupDesc">Group ↓</option>
-          <option value="default">Order</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Compact table (only key fields) -->
-    <div *ngIf="selectedProject.entries.length > 0" class="mt-1 overflow-x-auto">
-      <table class="min-w-full text-[10px] border-collapse">
-        <thead>
-          <tr class="bg-black border-b border-gray-700">
-            <th class="px-2 py-1 text-left font-semibold">Charge</th>
-            <th class="px-2 py-1 text-left font-semibold">Shots</th>
-            <th class="px-2 py-1 text-left font-semibold">v̄</th>
-            <th class="px-2 py-1 text-left font-semibold">ES</th>
-            <th class="px-2 py-1 text-left font-semibold">SD</th>
-            <th class="px-2 py-1"></th>
-          </tr>
-        </thead>
-
-        <tbody>
-          <tr
-            *ngFor="let e of entriesForSelectedProject"
-            [ngClass]="bestEntryForSelectedProject && e.id === bestEntryForSelectedProject.id
-              ? 'bg-orange-900/40 border-b border-orange-600'
-              : 'bg-black border-b border-gray-800'">
-
-            <!-- Charge -->
-            <td class="px-2 py-1">
-              {{ e.chargeGr != null ? e.chargeGr : '-' }}
-            </td>
-
-            <!-- Shots -->
-            <td class="px-2 py-1">
-              {{ e.shotsFired != null ? e.shotsFired : '-' }}
-            </td>
-
-            <!-- Stats -->
-            <ng-container *ngIf="statsForEntry(e) as s; else noStats">
-              <td class="px-2 py-1">
-                {{ s.avg }}
-              </td>
-              <td class="px-2 py-1">
-                {{ s.es }}
-              </td>
-              <td class="px-2 py-1">
-                {{ s.sd }}
-              </td>
-            </ng-container>
-            <ng-template #noStats>
-              <td class="px-2 py-1">-</td>
-              <td class="px-2 py-1">-</td>
-              <td class="px-2 py-1">-</td>
-            </ng-template>
-
-            <!-- Actions -->
-            <td class="px-2 py-1 whitespace-nowrap">
-              <div class="flex gap-1">
-                <button class="px-1 py-0.5 text-[9px] rounded bg-gray-700" (click)="editEntry(e)">
-                  Edit
-                </button>
-                <button class="px-1 py-0.5 text-[9px] rounded bg-gray-700" (click)="duplicateEntry(e)">
-                  Copy
-                </button>
-                <button class="px-1 py-0.5 text-[9px] rounded bg-red-600" (click)="deleteEntry(e)">
-                  Del
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- No entries -->
-    <div *ngIf="selectedProject.entries.length === 0" class="text-[11px] text-gray-400 mt-1">
-      No entries yet. Use the planner above to generate loads or tap <strong>Add entry</strong>.
     </div>
 
   </div>

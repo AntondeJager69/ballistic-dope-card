@@ -83,6 +83,10 @@ export class LoadDevTabComponent implements OnInit {
 
   entrySortMode: EntrySortMode = 'chargeAsc';
 
+  // collapsible panels inside the project view
+  resultsPanelOpen = true;
+  plannerPanelOpen = false;
+
   constructor(private data: DataService) {}
 
   // ---------------- lifecycle ----------------
@@ -179,6 +183,7 @@ export class LoadDevTabComponent implements OnInit {
       this.projects = [];
       this.selectedProject = null;
       this.selectedProjectId = null;
+      this.updatePanelStates();
       return;
     }
 
@@ -192,6 +197,7 @@ export class LoadDevTabComponent implements OnInit {
     }
 
     this.resetPlannerForProject();
+    this.updatePanelStates();
   }
 
   newProject(): void {
@@ -268,6 +274,7 @@ export class LoadDevTabComponent implements OnInit {
     this.selectedProjectId = project.id;
     this.selectedProject = project;
     this.resetPlannerForProject();
+    this.updatePanelStates();
   }
 
   deleteProject(project: LoadDevProject): void {
@@ -313,6 +320,20 @@ export class LoadDevTabComponent implements OnInit {
     return !!this.selectedProject &&
       (this.selectedProject.type === 'ladder' ||
         this.selectedProject.type === 'ocw');
+  }
+
+  private updatePanelStates(): void {
+    if (!this.selectedProject) {
+      this.resultsPanelOpen = false;
+      this.plannerPanelOpen = false;
+      return;
+    }
+    const hasEntries =
+      Array.isArray(this.selectedProject.entries) &&
+      this.selectedProject.entries.length > 0;
+
+    this.resultsPanelOpen = hasEntries;
+    this.plannerPanelOpen = !hasEntries && this.isPlannerVisible;
   }
 
   generateSeriesFromPlanner(): void {
@@ -541,42 +562,6 @@ export class LoadDevTabComponent implements OnInit {
   }
 
   // ---------------- entry summary & "best" ----------------
-
-  entrySummary(e: LoadDevEntry): string {
-    const parts: string[] = [];
-
-    if (e.chargeGr != null && e.powder) {
-      parts.push(`${e.chargeGr} gr ${e.powder}`);
-    } else if (e.chargeGr != null) {
-      parts.push(`${e.chargeGr} gr`);
-    }
-
-    if (e.bulletWeightGr != null && e.bullet) {
-      parts.push(`${e.bulletWeightGr} gr ${e.bullet}`);
-    } else if (e.bulletWeightGr != null) {
-      parts.push(`${e.bulletWeightGr} gr`);
-    }
-
-    if (e.distanceM != null) {
-      parts.push(`${e.distanceM} m`);
-    }
-
-    if (e.shotsFired != null) {
-      parts.push(`${e.shotsFired} shots`);
-    }
-
-    if (e.groupSize != null) {
-      const unit = e.groupUnit ? e.groupUnit : ('MOA' as GroupSizeUnit);
-      parts.push(`${e.groupSize} ${unit}`);
-    }
-
-    const stats = this.statsForEntry(e);
-    if (stats) {
-      parts.push(`v̄ ${stats.avg} (ES ${stats.es}, SD ${stats.sd})`);
-    }
-
-    return parts.join(' • ');
-  }
 
   bestEntryForProject(p: LoadDevProject): LoadDevEntry | null {
     if (!p.entries || p.entries.length === 0) return null;

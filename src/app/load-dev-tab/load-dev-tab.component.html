@@ -21,7 +21,7 @@
       </span>
     </label>
 
-    <div class="flex justify-between items-center mt-2">
+    <div class="flex justify-between items-center mt-1">
       <span class="text-[11px] text-gray-300">
         Projects for this rifle: {{ projects.length }}
       </span>
@@ -53,7 +53,7 @@
       [ngClass]="p.id === selectedProjectId ? 'border-orange-500' : 'border-gray-700'">
 
       <div class="flex justify-between items-start">
-        <div>
+        <div class="space-y-0.5">
           <div class="text-[12px] font-semibold">
             {{ p.name }}
           </div>
@@ -63,12 +63,22 @@
           <div class="text-[10px] text-gray-400" *ngIf="p.entries.length > 0">
             {{ p.entries.length }} test {{ p.entries.length === 1 ? 'entry' : 'entries' }}
           </div>
+          <div *ngIf="bestEntryForProject(p)" class="text-[10px] text-orange-300">
+            Best group: {{ bestEntryForProject(p)?.groupSize }}
+            {{ bestEntryForProject(p)?.groupUnit || 'MOA' }}
+            – {{ bestEntryForProject(p)?.loadLabel }}
+          </div>
         </div>
-        <div class="flex gap-2 text-[10px]">
+        <div class="flex flex-col gap-1 text-[10px]">
           <button
             class="px-2 py-1 rounded bg-gray-700"
             (click)="openProject(p)">
             Open
+          </button>
+          <button
+            class="px-2 py-1 rounded bg-gray-700"
+            (click)="editProject(p)">
+            Edit
           </button>
           <button
             class="px-2 py-1 rounded bg-red-600"
@@ -76,12 +86,6 @@
             Delete
           </button>
         </div>
-      </div>
-
-      <div *ngIf="p.id === selectedProjectId && bestEntryForSelectedProject" class="text-[10px] text-orange-400 mt-1">
-        Best group so far:
-        {{ bestEntryForSelectedProject?.loadLabel }}
-        ({{ bestEntryForSelectedProject?.groupSize }} {{ bestEntryForSelectedProject?.groupUnit || 'MOA' }})
       </div>
     </div>
   </div>
@@ -126,8 +130,27 @@
       </select>
     </label>
 
+    <!-- WIZARD HELP: PROJECT TYPE EXPLANATION (compact) -->
+    <div *ngIf="projectForm.type === 'ladder'" class="mt-1 rounded bg-black/80 border border-gray-700 p-2 text-[10px] text-gray-100">
+      <div class="font-semibold text-orange-300 mb-1">Ladder test – quick workflow</div>
+      <ol class="list-decimal list-inside space-y-1">
+        <li>Create one entry per powder charge (same bullet, COAL, primer).</li>
+        <li>Shoot one shot per charge at same distance.</li>
+        <li>Record POI / pressure signs; look for a flat vertical node.</li>
+      </ol>
+    </div>
+
+    <div *ngIf="projectForm.type === 'ocw'" class="mt-1 rounded bg-black/80 border border-gray-700 p-2 text-[10px] text-gray-100">
+      <div class="font-semibold text-orange-300 mb-1">OCW – quick workflow</div>
+      <ol class="list-decimal list-inside space-y-1">
+        <li>Each entry is a 3–5 round group at a different charge.</li>
+        <li>Shoot groups in round-robin order to even out barrel heat.</li>
+        <li>Look for 2–3 adjacent charges with similar POI and tight groups.</li>
+      </ol>
+    </div>
+
     <label class="flex flex-col">
-      Notes (optional)
+      Notes
       <textarea
         [(ngModel)]="projectForm.notes"
         name="projectNotes"
@@ -135,14 +158,14 @@
         class="mt-1 px-2 py-1 rounded bg-black border border-gray-700"></textarea>
     </label>
 
-    <div class="flex justify-end gap-2 mt-2">
+    <div class="flex justify-end gap-2 mt-1 text-[11px]">
       <button
-        class="px-3 py-1 text-[11px] rounded bg-gray-700"
+        class="px-3 py-1 rounded bg-gray-700"
         (click)="cancelProjectForm()">
         Cancel
       </button>
       <button
-        class="px-3 py-1 text-[11px] rounded bg-orange-500 text-black font-semibold"
+        class="px-3 py-1 rounded bg-orange-500 text-black font-semibold"
         (click)="saveProject()">
         Save project
       </button>
@@ -152,7 +175,7 @@
   <!-- Project detail + entries -->
   <div *ngIf="selectedProject" class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
     <div class="flex justify-between items-start">
-      <div>
+      <div class="space-y-0.5">
         <div class="text-sm font-semibold">
           {{ selectedProject.name }}
         </div>
@@ -164,25 +187,78 @@
         </div>
       </div>
       <button
-        class="px-2 py-1 text-[10px] rounded bg-gray-700"
+        class="px-2 py-1 text-[10px] rounded bg-orange-500 text-black font-semibold"
         (click)="newEntry()">
         Add entry
       </button>
     </div>
 
-    <div *ngIf="selectedProject.entries.length === 0" class="text-[11px] text-gray-400">
+    <!-- Small summary for selected project -->
+    <div *ngIf="bestEntryForSelectedProject" class="mt-1 text-[10px] text-orange-300">
+      Best group so far:
+      {{ bestEntryForSelectedProject?.groupSize }} {{ bestEntryForSelectedProject?.groupUnit || 'MOA' }}
+      – {{ bestEntryForSelectedProject?.loadLabel }}
+    </div>
+
+    <!-- WIZARD HELP: HOW TO RUN THIS PROJECT -->
+    <div *ngIf="selectedProject.type === 'ladder'" class="mt-1 rounded bg-black/80 border border-gray-700 p-2 text-[10px] text-gray-100">
+      <div class="font-semibold text-orange-300 mb-1">Ladder test workflow</div>
+      <ol class="list-decimal list-inside space-y-1">
+        <li>Use <strong>Add entry</strong> to create one row per charge (e.g. 42.0, 42.3, 42.6&nbsp;gr).</li>
+        <li>Keep bullet, COAL and primer the same for all entries.</li>
+        <li>Shoot one round from each charge in order (or round-robin) onto the same target.</li>
+        <li>Record POI notes and any pressure signs in each entry.</li>
+      </ol>
+    </div>
+
+    <div *ngIf="selectedProject.type === 'ocw'" class="mt-1 rounded bg-black/80 border border-gray-700 p-2 text-[10px] text-gray-100">
+      <div class="font-semibold text-orange-300 mb-1">OCW workflow</div>
+      <ol class="list-decimal list-inside space-y-1">
+        <li>Create one entry per charge in your OCW set.</li>
+        <li>Each entry represents a 3–5 shot group at the same distance.</li>
+        <li>Shoot one round from each load, then repeat, to even out barrel conditions.</li>
+        <li>Record group size and POI, then look for a stable node in POI and group size.</li>
+      </ol>
+    </div>
+
+    <!-- Entry sorting controls -->
+    <div class="mt-1 flex items-center justify-between text-[10px] text-gray-300">
+      <div>
+        Entries: {{ selectedProject.entries.length }}
+      </div>
+      <div class="flex items-center gap-1">
+        <span>Sort</span>
+        <select
+          [(ngModel)]="entrySortMode"
+          name="entrySort"
+          class="px-1 py-0.5 rounded bg-black border border-gray-700 text-[10px]">
+          <option value="default">Entry order</option>
+          <option value="chargeAsc">Charge ↑</option>
+          <option value="groupAsc">Group size ↑</option>
+          <option value="groupDesc">Group size ↓</option>
+        </select>
+      </div>
+    </div>
+
+    <div *ngIf="selectedProject.entries.length === 0" class="text-[11px] text-gray-400 mt-1">
       No entries yet. Add your first ladder step, OCW charge, or test group.
     </div>
 
+    <!-- Entries list -->
     <div
-      *ngFor="let e of selectedProject.entries"
+      *ngFor="let e of sortedEntries"
       class="bg-black rounded-lg p-2 mt-1 border border-gray-700 flex justify-between items-start gap-2">
-      <div class="text-[11px]">
+      <div class="text-[11px] space-y-0.5">
         <div class="font-semibold">
           {{ e.loadLabel }}
         </div>
         <div class="text-[10px] text-gray-300">
           {{ entrySummary(e) }}
+        </div>
+        <div *ngIf="statsForEntry(e)" class="text-[10px] text-orange-300">
+          <ng-container *ngIf="statsForEntry(e) as s">
+            v̄ {{ s.avg }} • ES {{ s.es }} • SD {{ s.sd }}
+          </ng-container>
         </div>
         <div *ngIf="e.poiNote" class="text-[10px] text-gray-400">
           POI: {{ e.poiNote }}
@@ -198,6 +274,11 @@
           Edit
         </button>
         <button
+          class="px-2 py-1 rounded bg-gray-700"
+          (click)="duplicateEntry(e)">
+          Duplicate
+        </button>
+        <button
           class="px-2 py-1 rounded bg-red-600"
           (click)="deleteEntry(e)">
           Delete
@@ -209,15 +290,15 @@
   <!-- Entry form -->
   <div *ngIf="entryFormVisible" class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
     <h3 class="text-xs font-semibold mb-1">
-      {{ editingEntry ? 'Edit entry' : 'New entry' }}
+      {{ editingEntry ? 'Edit test entry' : 'New test entry' }}
     </h3>
 
     <label class="flex flex-col">
       Load label
       <input
         [(ngModel)]="entryForm.loadLabel"
-        name="entryLoadLabel"
-        placeholder="e.g. 42.3 gr N570 / 140 ELD-M / 2.810"
+        name="entryLabel"
+        placeholder="e.g. 42.5 gr N570 / 140 ELD-M / 2.810”"
         class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
     </label>
 
@@ -311,6 +392,27 @@
       </label>
     </div>
 
+    <!-- Velocity capture -->
+    <div class="space-y-1 mt-1">
+      <label class="flex flex-col">
+        Velocities (e.g. 2780, 2784, 2775)
+        <textarea
+          [(ngModel)]="entryForm.velocityInput"
+          name="entryVelocities"
+          rows="2"
+          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700 text-[11px]"
+          placeholder="Comma-separated or space-separated values from your chronograph"></textarea>
+      </label>
+
+      <div *ngIf="entryVelocityStats as v" class="text-[10px] text-orange-300">
+        Live stats:
+        v̄ {{ v.avg }} • ES {{ v.es }} • SD {{ v.sd }}
+      </div>
+      <div *ngIf="!entryVelocityStats && entryForm.velocityInput.trim().length > 0" class="text-[10px] text-gray-400">
+        Enter at least two valid numbers to see stats.
+      </div>
+    </div>
+
     <label class="flex flex-col">
       POI relative to aim
       <input
@@ -329,14 +431,14 @@
         class="mt-1 px-2 py-1 rounded bg-black border border-gray-700"></textarea>
     </label>
 
-    <div class="flex justify-end gap-2 mt-2">
+    <div class="flex justify-end gap-2 mt-1 text-[11px]">
       <button
-        class="px-3 py-1 text-[11px] rounded bg-gray-700"
+        class="px-3 py-1 rounded bg-gray-700"
         (click)="cancelEntryForm()">
         Cancel
       </button>
       <button
-        class="px-3 py-1 text-[11px] rounded bg-orange-500 text-black font-semibold"
+        class="px-3 py-1 rounded bg-orange-500 text-black font-semibold"
         (click)="saveEntry()">
         Save entry
       </button>

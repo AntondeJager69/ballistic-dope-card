@@ -31,7 +31,11 @@ interface EntryForm {
   groupUnit: GroupSizeUnit;
   poiNote: string;
   notes: string;
+  /** Comma-separated velocities, e.g. "2780, 2784, 2775" */
+  velocityInput: string;
 }
+
+type EntrySortMode = 'default' | 'chargeAsc' | 'groupAsc' | 'groupDesc';
 
 @Component({
   selector: 'app-load-dev-tab',
@@ -73,8 +77,12 @@ export class LoadDevTabComponent implements OnInit {
     groupSize: null,
     groupUnit: 'MOA',
     poiNote: '',
-    notes: ''
+    notes: '',
+    velocityInput: ''
   };
+
+  // Sorting mode for entries in the selected project
+  entrySortMode: EntrySortMode = 'default';
 
   constructor(private data: DataService) {}
 
@@ -99,13 +107,104 @@ export class LoadDevTabComponent implements OnInit {
   get bestEntryForSelectedProject(): LoadDevEntry | null {
     const p = this.selectedProject;
     if (!p || !p.entries || p.entries.length === 0) return null;
+    return this.bestEntryForProject(p);
+  }
 
+  get sortedEntries(): LoadDevEntry[] {
+    const p = this.selectedProject;
+    if (!p || !p.entries) return [];
+
+    const entries = [...p.entries];
+
+    if (this.entrySortMode === 'default') return entries;
+
+    if (this.entrySortMode === 'chargeAsc') {
+      return entries.sort((a, b) => {
+        const ca = a.chargeGr ?? Number.POSITIVE_INFINITY;
+        const cb = b.chargeGr ?? Number.POSITIVE_INFINITY;
+        return ca - cb;
+      });
+    }
+
+    if (this.entrySortMode === 'groupAsc' || this.entrySortMode === 'groupDesc') {
+      return entries.sort((a, b) => {
+        const ga = a.groupSize ?? Number.POSITIVE_INFINITY;
+        const gb = b.groupSize ?? Number.POSITIVE_INFINITY;
+        const diff = ga - gb;
+        return this.entrySortMode === 'groupAsc' ? diff : -diff;
+      });
+    }
+
+    return entries;
+  }
+
+  bestEntryForProject(p: LoadDevProject): LoadDevEntry | null {
+    if (!p.entries || p.entries.length === 0) return null;
     const withSize = p.entries.filter(e => e.groupSize != null);
     if (withSize.length === 0) return null;
-
     return withSize.reduce((best, current) =>
-      current.groupSize! < (best.groupSize ?? Infinity) ? current : best
+      (current.groupSize ?? Infinity) < (best.groupSize ?? Infinity) ? current : best
     );
+  }
+
+  // ---------- Velocity helpers ----------
+
+  private parseVelocityString(raw?: string): number[] {
+    if (!raw) return [];
+    return raw
+      .split(/[,;\s]+/)
+      .map(v => parseFloat(v))
+      .filter(v => !Number.isNaN(v));
+  }
+
+  private computeVelocityStats(values: number[]):
+    { avg: number; es: number; sd: number } | null {
+    if (!values || values.length === 0) return null;
+    const n = values.length;
+    const sum = values.reduce((a, b) => a + b, 0);
+    const avg = sum / n;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const es = max - min;
+    const variance =
+      values.reduce((acc, v) => acc + Math.pow(v - avg, 2), 0) / n;
+    const sd = Math.sqrt(variance);
+
+    const round1 = (x: number) => Math.round(x * 10) / 10;
+
+    return {
+      avg: Math.round(avg),
+      es: round1(es),
+      sd: round1(sd)
+    };
+  }
+
+  /** Live stats for the entry form velocities */
+  get entryVelocityStats():
+    | { avg: number; es: number; sd: number }
+    | null {
+    const vals = this.parseVelocityString(this.entryForm.velocityInput);
+    if (vals.length < 2) return null;
+    return this.computeVelocityStats(vals);
+  }
+
+  /** Stats taken from a saved entry (values stored in the entry object) */
+  statsForEntry(e: LoadDevEntry):
+    | { avg: number; es: number; sd: number }
+    | null {
+    const anyE = e as any;
+    if (anyE.avgVelocity == null || anyE.esVelocity == null || anyE.sdVelocity == null) {
+      // Try to compute from saved string, if present
+      const velString: string | undefined = anyE.velocityString;
+      const vals = this.parseVelocityString(velString);
+      if (vals.length < 2) return null;
+      return this.computeVelocityStats(vals);
+    }
+    return {
+      avg: anyE.avgVelocity,
+      es: anyE.esVelocity,
+      sd: anyE.sdVelocity
+    };
   }
 
   // ---------- Rifle & project loading ----------
@@ -113,6 +212,8 @@ export class LoadDevTabComponent implements OnInit {
   onRifleChange() {
     this.loadProjects();
     this.selectedProjectId = null;
+    this.entryFormVisible = false;
+    this.editingEntry = null;
   }
 
   loadProjects() {
@@ -193,6 +294,8 @@ export class LoadDevTabComponent implements OnInit {
     if (this.selectedProjectId === p.id) {
       this.selectedProjectId = null;
     }
+    this.entryFormVisible = false;
+    this.editingEntry = null;
     this.loadProjects();
   }
 
@@ -200,6 +303,7 @@ export class LoadDevTabComponent implements OnInit {
     this.selectedProjectId = p.id;
     this.entryFormVisible = false;
     this.editingEntry = null;
+    this.entrySortMode = 'default';
   }
 
   // ---------- Entry form ----------
@@ -218,7 +322,8 @@ export class LoadDevTabComponent implements OnInit {
       groupSize: null,
       groupUnit: 'MOA',
       poiNote: '',
-      notes: ''
+      notes: '',
+      velocityInput: ''
     };
     this.editingEntry = null;
   }
@@ -233,6 +338,7 @@ export class LoadDevTabComponent implements OnInit {
   }
 
   editEntry(entry: LoadDevEntry) {
+    const anyEntry = entry as any;
     this.editingEntry = entry;
     this.entryFormVisible = true;
     this.entryForm = {
@@ -246,10 +352,44 @@ export class LoadDevTabComponent implements OnInit {
       distanceM: entry.distanceM ?? null,
       shotsFired: entry.shotsFired ?? null,
       groupSize: entry.groupSize ?? null,
-      groupUnit: entry.groupUnit ?? 'MOA',
+      groupUnit: (entry.groupUnit as GroupSizeUnit) || 'MOA',
       poiNote: entry.poiNote || '',
-      notes: entry.notes || ''
+      notes: entry.notes || '',
+      velocityInput: anyEntry.velocityString || ''
     };
+  }
+
+  duplicateEntry(entry: LoadDevEntry) {
+    const project = this.selectedProject;
+    if (!project) return;
+
+    const anyEntry = entry as any;
+    const base: any = {
+      loadLabel: entry.loadLabel ? `${entry.loadLabel} (copy)` : 'Copy of entry',
+      powder: entry.powder,
+      chargeGr: entry.chargeGr,
+      coal: entry.coal,
+      primer: entry.primer,
+      bullet: entry.bullet,
+      bulletWeightGr: entry.bulletWeightGr,
+      distanceM: entry.distanceM,
+      shotsFired: entry.shotsFired,
+      groupSize: entry.groupSize,
+      groupUnit: entry.groupUnit,
+      poiNote: entry.poiNote,
+      notes: entry.notes ? `${entry.notes} (copy)` : 'Copy of entry',
+      velocityString: anyEntry.velocityString,
+      avgVelocity: anyEntry.avgVelocity,
+      esVelocity: anyEntry.esVelocity,
+      sdVelocity: anyEntry.sdVelocity
+    };
+
+    this.data.addLoadDevEntry(project.id, base);
+    this.loadProjects();
+    const refreshed = this.projects.find(p => p.id === project.id);
+    if (refreshed) {
+      this.selectedProjectId = refreshed.id;
+    }
   }
 
   cancelEntryForm() {
@@ -268,7 +408,7 @@ export class LoadDevTabComponent implements OnInit {
       return;
     }
 
-    const base: Omit<LoadDevEntry, 'id'> = {
+    const base: any = {
       loadLabel: this.entryForm.loadLabel.trim(),
       powder: this.entryForm.powder.trim() || undefined,
       chargeGr: this.entryForm.chargeGr ?? undefined,
@@ -284,6 +424,23 @@ export class LoadDevTabComponent implements OnInit {
       notes: this.entryForm.notes.trim() || undefined
     };
 
+    // Attach velocity info to the entry (flexible "any" fields)
+    const rawVel = this.entryForm.velocityInput.trim();
+    if (rawVel) {
+      base.velocityString = rawVel;
+      const stats = this.entryVelocityStats;
+      if (stats) {
+        base.avgVelocity = stats.avg;
+        base.esVelocity = stats.es;
+        base.sdVelocity = stats.sd;
+      }
+    } else {
+      base.velocityString = undefined;
+      base.avgVelocity = undefined;
+      base.esVelocity = undefined;
+      base.sdVelocity = undefined;
+    }
+
     if (this.editingEntry) {
       const updated: LoadDevEntry = {
         ...this.editingEntry,
@@ -294,7 +451,6 @@ export class LoadDevTabComponent implements OnInit {
       this.data.addLoadDevEntry(project.id, base);
     }
 
-    // Reload project list and re-select
     this.loadProjects();
     const refreshed = this.projects.find(p => p.id === project.id);
     if (refreshed) {
@@ -339,7 +495,15 @@ export class LoadDevTabComponent implements OnInit {
     const parts: string[] = [];
     if (e.chargeGr != null) parts.push(`${e.chargeGr} gr`);
     if (e.distanceM != null) parts.push(`${e.distanceM} m`);
-    if (e.groupSize != null) parts.push(`${e.groupSize} ${e.groupUnit ?? 'MOA'}`);
+    if (e.groupSize != null) {
+      parts.push(`${e.groupSize} ${e.groupUnit ?? 'MOA'}`);
+    }
+
+    const stats = this.statsForEntry(e);
+    if (stats) {
+      parts.push(`v̄ ${stats.avg} (ES ${stats.es}, SD ${stats.sd})`);
+    }
+
     return parts.join(' • ');
   }
 }

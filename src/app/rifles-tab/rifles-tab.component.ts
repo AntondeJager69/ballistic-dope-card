@@ -19,7 +19,10 @@ export class RiflesTabComponent implements OnInit {
 
   // rifle selection / forms
   selectedRifleId: string | number | null = null;
-  addFormVisible = true;
+
+  // ⬇⬇⬇ change: start collapsed instead of true
+  addFormVisible = false;
+
   editingRifle: Rifle | null = null;
 
   // load visibility / forms
@@ -132,6 +135,7 @@ export class RiflesTabComponent implements OnInit {
     this.clearRifleForm();
     this.refresh();
     this.selectedRifleId = rifle.id!;
+    this.addFormVisible = false; // collapse again after save if you want
   }
 
   deleteRifle(r: Rifle): void {

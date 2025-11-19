@@ -10,6 +10,7 @@ import {
   DistanceDope,
   Session
 } from '../models';
+import { BleClient } from '@capacitor-community/bluetooth-le';
 
 type WizardStep = 'setup' | 'environment' | 'shots' | 'complete';
 
@@ -52,15 +53,13 @@ export class SessionTabComponent implements OnInit {
   dopeRows: DistanceDope[] = [];
   completeMessage = '';
 
-
-// Kestrel integration state
-kestrelConnected = false;
-kestrelStatus = 'Not connected';
-kestrelLastUpdate: Date | null = null;
-kestrelData: KestrelSnapshot | null = null;
-kestrelError: string | null = null;
-kestrelIsConnecting = false;
-
+  // Kestrel integration state
+  kestrelConnected = false;
+  kestrelStatus = 'Not connected';
+  kestrelLastUpdate: Date | null = null;
+  kestrelData: KestrelSnapshot | null = null;
+  kestrelError: string | null = null;
+  kestrelIsConnecting = false;
 
   constructor(private data: DataService) {}
 
@@ -161,10 +160,10 @@ kestrelIsConnecting = false;
     this.step = 'environment';
   }
 
-  // ---------- Kestrel integration (mock for now) ----------
+  // ---------- Kestrel integration ----------
 
+  // Mock reader (kept for testing without hardware)
   mockReadFromKestrel(): void {
-    // Simulated Kestrel snapshot (later replace with real Bluetooth read)
     const mock: KestrelSnapshot = {
       temperatureC: 23.7,
       humidityPercent: 38,
@@ -187,44 +186,157 @@ kestrelIsConnecting = false;
     this.environment.windSpeedMps = mock.windSpeedMph; // using mph in UI
     this.windClock = mock.windClock;
   }
-// Real Kestrel Bluetooth connection (experimental)
+
+  // Real Kestrel Bluetooth connection using Capacitor BLE (Android)
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+
+
 async connectKestrelBluetooth(): Promise<void> {
   this.kestrelError = null;
   this.kestrelIsConnecting = true;
-  this.kestrelStatus = 'Opening Bluetooth device chooser…';
+  this.kestrelStatus = 'Scanning for Kestrel…';
+
+  // Correct Kestrel Weather service + Sensor Measurements characteristic
+  // from your getServices() output + Weather Protocol:
+  const kestrelServiceUuid = '03290000-eab4-dea1-b24e-44ec023874db';
+  const sensorMeasurementsUuid = '03290310-eab4-dea1-b24e-44ec023874db';
 
   try {
-    const navAny = navigator as any;
-    if (!navAny.bluetooth) {
-      throw new Error('Web Bluetooth is not supported in this browser.');
+    // 1) Init BLE (Android 12+ friendly)
+    await BleClient.initialize({ androidNeverForLocation: true });
+
+    const enabled = await BleClient.isEnabled().catch(() => true);
+    if (!enabled) {
+      this.kestrelStatus = 'Bluetooth is off – asking to enable…';
+      await BleClient.requestEnable();
     }
 
-    // NK Kestrel custom service & Sensor Measurements characteristic
-    // Built from the custom UUID base in the LiNK doc + table UUIDs 0x0000 (service) and 0x0310 (Sensor Measurements). 
-    const kestrelServiceUuid = 'db743802-ec44-4eb2-a1de-b4ea00002903';
-    const sensorMeasurementsUuid = 'db743802-ec44-4eb2-a1de-b4ea10032903';
+    // 2) Scan for devices and pick the first that looks like your ELITE Kestrel
+    let foundDevice: any = null;
 
-    const device = await navAny.bluetooth.requestDevice({
-      filters: [
-        { namePrefix: 'K5' },      // K5000 / 5700 etc.
-        { namePrefix: 'K7' },      // other series
-        { namePrefix: 'Kestrel' }  // generic
-      ],
-      optionalServices: [kestrelServiceUuid]
+    this.kestrelStatus = 'Scanning for Kestrel (up to 8s)…';
+    console.log('Starting BLE scan…');
+
+    await BleClient.requestLEScan(
+      {} as any,
+      (result) => {
+        const dev = result.device;
+        const name = (dev?.name || '').trim();
+        console.log('Scan result:', dev);
+
+        if (!foundDevice && name) {
+          const lower = name.toLowerCase();
+
+          const looksLikeKestrel =
+            lower.startsWith('elite') ||       // "ELITE - 2998963"
+            lower.includes('elite') ||
+            lower.includes('2998') ||          // your serial fragment
+            lower.includes('kestrel') ||
+            lower.startsWith('k5') ||
+            lower.startsWith('k7') ||
+            lower.includes('5700');
+
+          if (looksLikeKestrel) {
+            foundDevice = dev;
+            this.kestrelStatus = `Found ${name}, preparing to connect…`;
+            console.log('Selected Kestrel candidate:', dev);
+          }
+        }
+      }
+    );
+
+    // Wait up to 8 seconds for a match
+    const timeoutMs = 8000;
+    const start = Date.now();
+    while (!foundDevice && Date.now() - start < timeoutMs) {
+      await this.sleep(400);
+    }
+
+    await BleClient.stopLEScan().catch(err =>
+      console.warn('stopLEScan failed (not fatal):', err)
+    );
+    console.log('Stopped BLE scan');
+
+    if (!foundDevice) {
+      this.kestrelStatus = 'No Kestrel device found during scan.';
+      this.kestrelError =
+        'No Kestrel seen in BLE scan. Ensure LiNK/Bluetooth is enabled on the device.';
+      return;
+    }
+
+    const device = foundDevice;
+    this.kestrelStatus = `Connecting to ${device.name || device.deviceId}…`;
+    console.log('Connecting to device:', device);
+
+    // 3) Connect
+    await BleClient.connect(device.deviceId, (id) => {
+      console.log('Kestrel disconnected', id);
+      this.kestrelConnected = false;
     });
 
-    this.kestrelStatus = `Connecting to ${device.name || 'device'}…`;
+    // 4) Discover all services / characteristics and log them
+    let services: any[] = [];
+    try {
+      services = await BleClient.getServices(device.deviceId);
+      console.log(
+        'Kestrel services discovered (FULL LIST):',
+        JSON.stringify(services, null, 2)
+      );
+    } catch (e) {
+      console.warn('getServices failed (not fatal):', e);
+    }
 
-    const server = await device.gatt!.connect();
-    const service = await server.getPrimaryService(kestrelServiceUuid);
-    const sensorChar = await service.getCharacteristic(sensorMeasurementsUuid);
+    // Find the Kestrel Weather service
+    const service = services.find(s =>
+      s.uuid?.toLowerCase() === kestrelServiceUuid.toLowerCase()
+    );
 
-    const value: DataView = await sensorChar.readValue();
-    const dv = value;
+    if (!service) {
+      this.kestrelStatus =
+        'Connected to device, but Kestrel Weather service UUID was not found.';
+      this.kestrelError =
+        'Check console for full service list; Weather service 03290000-… must be present.';
+      this.kestrelConnected = true; // connected, but no weather service
+      this.kestrelLastUpdate = new Date();
+      return;
+    }
 
-    // ⚠️ Byte layout is based on the "Measurement Details" table from the Weather Protocol:
-    // wind speed, temp, humidity, pressure each 2 bytes, metric, 0.1 resolution. 
-    // This is a best guess for ordering. If values look wrong, we can adjust offsets.
+    // Find the Sensor Measurements characteristic in that service
+    const char = (service.characteristics || []).find((c: any) =>
+      c.uuid?.toLowerCase() === sensorMeasurementsUuid.toLowerCase()
+    );
+
+    if (!char) {
+      this.kestrelStatus =
+        'Connected, Weather service found, but Sensor Measurements characteristic (03290310-…) not found.';
+      this.kestrelError =
+        'Check console for characteristics under 03290000-… and adjust sensorMeasurementsUuid if needed.';
+      this.kestrelConnected = true;
+      this.kestrelLastUpdate = new Date();
+      return;
+    }
+
+    // 5) Read the Sensor Measurements characteristic
+    const value = await BleClient.read(
+      device.deviceId,
+      kestrelServiceUuid,
+      sensorMeasurementsUuid
+    );
+
+    const dv =
+      value instanceof DataView
+        ? value
+        : new DataView(
+            (value as any).buffer
+              ? (value as any).buffer
+              : new Uint8Array(value as any).buffer
+          );
+
+    // Byte layout (still our current best guess):
+    // wind, temp, humidity, pressure – each 2 bytes, LE, x10
     const windRaw = dv.getUint16(0, true);     // m/s * 10
     const tempRaw = dv.getInt16(2, true);      // °C * 10
     const rhRaw = dv.getUint16(4, true);       // % * 10
@@ -236,20 +348,19 @@ async connectKestrelBluetooth(): Promise<void> {
     const humidity = rhRaw / 10;
     const pressureHpa = pressureRaw / 10;
 
-    console.log('Kestrel SensorMeasurements raw (first 8 bytes):', {
+    console.log('Kestrel SensorMeasurements raw:', {
       windRaw,
       tempRaw,
       rhRaw,
       pressureRaw
     });
 
-    // Push into environment model
+    // Push into environment model (mph in UI)
     this.environment.temperatureC = tempC;
     this.environment.humidityPercent = humidity;
     this.environment.pressureHpa = pressureHpa;
-    this.environment.windSpeedMps = parseFloat(windMph.toFixed(1)); // using mph here
+    this.environment.windSpeedMps = parseFloat(windMph.toFixed(1));
 
-    // Update snapshot object for display
     this.kestrelData = {
       temperatureC: tempC,
       humidityPercent: humidity,
@@ -263,17 +374,14 @@ async connectKestrelBluetooth(): Promise<void> {
     this.kestrelLastUpdate = new Date();
     this.kestrelStatus = `Connected to ${device.name || 'Kestrel'} and imported data.`;
   } catch (err: any) {
-    if (err && err.name === 'NotFoundError') {
-      this.kestrelStatus = 'Bluetooth device picker was closed.';
-    } else {
-      console.error('Kestrel Bluetooth error:', err);
-      this.kestrelStatus = 'Kestrel connection failed.';
-      this.kestrelError = err?.message || String(err);
-    }
+    console.error('Kestrel Bluetooth error:', err);
+    this.kestrelStatus = 'Kestrel connection failed.';
+    this.kestrelError = err?.message || String(err);
   } finally {
     this.kestrelIsConnecting = false;
   }
 }
+
 
   // ---------- Environment step ----------
 
@@ -383,6 +491,8 @@ async connectKestrelBluetooth(): Promise<void> {
     this.kestrelStatus = 'Not connected';
     this.kestrelLastUpdate = null;
     this.kestrelData = null;
+    this.kestrelError = null;
+    this.kestrelIsConnecting = false;
 
     this.rifles = this.data.getRifles();
     this.venues = this.data.getVenues();

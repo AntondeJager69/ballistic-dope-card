@@ -21,7 +21,7 @@ export class VenuesTabComponent implements OnInit {
   venues: Venue[] = [];
 
   // form state
-  formVisible = true;
+  formVisible = false;
   editingVenue: Venue | null = null;
 
   // dropdown + expanded state

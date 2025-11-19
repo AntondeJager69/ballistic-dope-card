@@ -72,7 +72,7 @@
 
       <!-- Subrange rows -->
       <div
-        *ngFor="let sr of venueSubRangesForm; let i = index"
+        *ngFor="let sr of subRangeRows; let i = index"
         class="bg-slate-900 rounded-lg p-2 mt-1 space-y-1">
 
         <div class="flex justify-between items-center">
@@ -111,7 +111,7 @@
       </div>
     </div>
 
-    <!-- Buttons: Add Subrange + Save Venue -->
+    <!-- Form actions -->
     <div class="flex justify-end gap-2 mt-3">
       <button
         class="px-3 py-1 text-xs rounded bg-slate-700"
@@ -136,71 +136,97 @@
 
   </div>
 
-  <!-- Stored venues list -->
+  <!-- Stored venues (dropdown + single expanded card) -->
   <div class="bg-slate-800 rounded-2xl p-3 shadow space-y-2">
-    <h2 class="text-sm font-semibold mb-1">
-      Stored Venues ({{ venues.length }})
-    </h2>
+    <div class="flex justify-between items-center mb-1">
+      <h2 class="text-sm font-semibold">
+        Venues
+      </h2>
+      <div class="text-[11px] text-slate-300">
+        Total: {{ venues.length }}
+      </div>
+    </div>
 
     <div *ngIf="venues.length === 0" class="text-[11px] text-slate-400">
       No venues saved yet. Use "Add Venue" above.
     </div>
 
-    <div
-      *ngFor="let v of venues"
-      class="bg-slate-900 rounded-2xl p-3 mt-1 space-y-2">
-
-      <!-- Venue header -->
-      <div class="flex justify-between items-center">
-        <div>
-          <div class="text-sm font-semibold">
+    <ng-container *ngIf="venues.length > 0">
+      <label class="flex flex-col text-[11px] mb-2">
+        Select venue
+        <select
+          [(ngModel)]="selectedVenueId"
+          (ngModelChange)="onSelectedVenueChange($event)"
+          name="selectedVenue"
+          class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700">
+          <option *ngFor="let v of venues" [ngValue]="v.id">
             {{ v.name }}
+          </option>
+        </select>
+      </label>
+
+      <ng-container *ngIf="selectedVenue as v">
+        <div class="bg-slate-900 rounded-2xl p-3 mt-1 space-y-2">
+
+          <!-- Venue header -->
+          <div class="flex justify-between items-center">
+            <div>
+              <div class="text-sm font-semibold">
+                {{ v.name }}
+              </div>
+              <div *ngIf="v.location" class="text-[11px] text-slate-300">
+                {{ v.location }}
+              </div>
+              <div *ngIf="v.altitudeM != null" class="text-[11px] text-slate-300">
+                Altitude: {{ v.altitudeM }} m
+              </div>
+              <div *ngIf="v.notes" class="text-[11px] text-slate-300">
+                Notes: {{ v.notes }}
+              </div>
+            </div>
+
+            <div class="flex gap-2 text-[11px]">
+              <button
+                class="px-3 py-1 rounded-xl bg-slate-100 text-slate-900 font-semibold"
+                (click)="toggleExpanded(v)">
+                {{ expandedVenueId === v.id ? 'Hide' : 'Show' }}
+              </button>
+
+              <button
+                class="px-2 py-1 rounded bg-slate-700"
+                (click)="editVenue(v)">
+                Edit Venue
+              </button>
+
+              <button
+                class="px-2 py-1 rounded bg-red-600"
+                (click)="deleteVenue(v)">
+                Delete
+              </button>
+            </div>
           </div>
-          <div *ngIf="v.location" class="text-[11px] text-slate-300">
-            {{ v.location }}
+
+          <!-- Subrange display -->
+          <div *ngIf="expandedVenueId === v.id" class="space-y-1 mt-2">
+
+            <div *ngIf="!v.subRanges || v.subRanges.length === 0" class="text-[11px] text-slate-400">
+              No subranges defined.
+            </div>
+
+            <div
+              *ngFor="let sr of v.subRanges"
+              class="bg-slate-950 rounded-xl p-2 text-[11px]">
+              <span class="font-semibold">{{ sr.name }}</span>
+              <span *ngIf="sr.distancesM?.length">
+                • {{ sr.distancesM.join(', ') }} m
+              </span>
+            </div>
+
           </div>
+
         </div>
-
-        <div class="flex gap-2 text-[11px]">
-          <button
-            class="px-3 py-1 rounded-xl bg-slate-100 text-slate-900 font-semibold"
-            (click)="toggleExpanded(v)">
-            {{ expandedVenueId === v.id ? 'Hide' : 'Show' }}
-          </button>
-
-          <button
-            class="px-2 py-1 rounded bg-slate-700"
-            (click)="editVenue(v)">
-            Edit Venue
-          </button>
-
-          <button
-            class="px-2 py-1 rounded bg-red-600"
-            (click)="deleteVenue(v)">
-            Delete
-          </button>
-        </div>
-      </div>
-
-      <!-- Subrange display -->
-      <div *ngIf="expandedVenueId === v.id" class="space-y-1 mt-1">
-
-        <div *ngIf="v.subRanges.length === 0" class="text-[11px] text-slate-400">
-          No subranges defined.
-        </div>
-
-        <div
-          *ngFor="let sr of v.subRanges"
-          class="bg-slate-950 rounded-xl p-2 text-[11px]">
-          <span class="font-semibold">{{ sr.name }}</span>
-          <span *ngIf="sr.distancesM?.length">
-            • {{ sr.distancesM.join(', ') }} m
-          </span>
-        </div>
-
-      </div>
-
-    </div>
+      </ng-container>
+    </ng-container>
   </div>
 
 </div>

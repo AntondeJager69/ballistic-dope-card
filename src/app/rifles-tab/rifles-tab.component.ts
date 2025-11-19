@@ -5,7 +5,6 @@ import { DataService } from '../data.service';
 import { Rifle, RifleLoad, ScopeUnit } from '../models';
 
 interface RifleForm extends Partial<Rifle> {}
-
 interface LoadForm extends Partial<RifleLoad> {}
 
 @Component({
@@ -13,39 +12,28 @@ interface LoadForm extends Partial<RifleLoad> {}
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './rifles-tab.component.html',
-  styleUrls: ['./rifles-tab.component.css']
+  styleUrls: ['./rifles-tab.component.css'],
 })
 export class RiflesTabComponent implements OnInit {
   rifles: Rifle[] = [];
 
-  addFormVisible = false;
+  // rifle selection / forms
+  selectedRifleId: string | number | null = null;
+  addFormVisible = true;
   editingRifle: Rifle | null = null;
 
+  // load visibility / forms
+  activeLoadsRifleId: string | number | null = null;      // which rifle’s loads table is open
+  activeLoadFormRifleId: string | number | null = null;   // which rifle’s add/edit load form is open
+  editingLoadId: string | number | null = null;
+
   rifleForm: RifleForm = {
-    name: '',
-    caliber: '',
-    barrelLength: null,
-    barrelUnit: 'cm',
-    twistRate: '',
-    muzzleVelocityFps: null,
-    scopeUnit: 'MIL',
-    bulletBc: '',
-    bulletWeightGr: null,
-    bulletName: '',
-    notes: '',
+    scopeUnit: 'MIL' as ScopeUnit,
+    barrelUnit: 'inch',
     roundCount: 0,
-    loads: []
   };
 
-  // load data form per rifle
-  activeLoadsRifleId: number | null = null;
-  loadForm: LoadForm = {
-    powder: '',
-    chargeGn: null as any,
-    coal: '',
-    primer: ''
-  };
-  editingLoadId: number | null = null;
+  loadForm: LoadForm = {};
 
   constructor(private data: DataService) {}
 
@@ -53,198 +41,261 @@ export class RiflesTabComponent implements OnInit {
     this.refresh();
   }
 
-  refresh() {
-    this.rifles = this.data.getRifles();
+  // --- Helpers ----------------------------------------------------------
+
+  private generateId(prefix: string): string {
+    return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   }
 
-  toggleAddForm() {
+  refresh(): void {
+    // Adjust to your DataService API if needed
+    if ((this.data as any).getRifles) {
+      this.rifles = (this.data as any).getRifles() as Rifle[];
+    } else {
+      // Fallback if your service exposes rifles directly
+      this.rifles = (this.data as any).rifles ?? [];
+    }
+
+    if (this.rifles.length && !this.selectedRifleId) {
+      this.selectedRifleId = this.rifles[0].id!;
+    }
+  }
+
+  get selectedRifle(): Rifle | undefined {
+    return this.rifles.find((r) => r.id === this.selectedRifleId);
+  }
+
+  // --- Rifle form logic -------------------------------------------------
+
+  toggleAddForm(): void {
     this.addFormVisible = !this.addFormVisible;
     if (!this.addFormVisible) {
       this.clearRifleForm();
     }
   }
 
-  clearRifleForm() {
-    this.editingRifle = null;
+  clearRifleForm(): void {
     this.rifleForm = {
-      name: '',
-      caliber: '',
-      barrelLength: null,
-      barrelUnit: 'cm',
-      twistRate: '',
-      muzzleVelocityFps: null,
-      scopeUnit: 'MIL',
-      bulletBc: '',
-      bulletWeightGr: null,
-      bulletName: '',
-      notes: '',
+      scopeUnit: 'MIL' as ScopeUnit,
+      barrelUnit: 'inch',
       roundCount: 0,
-      loads: []
     };
+    this.editingRifle = null;
   }
 
-  newRifle() {
-    this.clearRifleForm();
+  onSelectedRifleChange(rifleId: string | number | null): void {
+    this.selectedRifleId = rifleId;
+  }
+
+  editRifle(r: Rifle): void {
     this.addFormVisible = true;
-  }
-
-  editRifle(r: Rifle) {
     this.editingRifle = r;
-    this.rifleForm = {
-      ...r
-    };
-    this.addFormVisible = true;
+
+    const { loads, ...rest } = r;
+    this.rifleForm = { ...rest };
   }
 
-  saveRifle() {
-    if (!this.rifleForm.name || !this.rifleForm.caliber) {
-      alert('Name and caliber are required.');
-      return;
-    }
+  saveRifle(): void {
+    const isEditing = !!this.editingRifle;
+    const existingLoads = this.editingRifle?.loads ?? [];
 
-    const normalizedLoads: RifleLoad[] = (this.rifleForm.loads ?? []).map(l => ({
-      id: l.id!,
-      powder: l.powder || '',
-      chargeGn: Number(l.chargeGn) || 0,
-      coal: l.coal || '',
-      primer: l.primer || ''
-    }));
+    // Ensure round count is numeric
+    const roundCount =
+      this.rifleForm.roundCount != null
+        ? Number(this.rifleForm.roundCount)
+        : 0;
 
-    const roundCount = this.rifleForm.roundCount != null
-      ? Number(this.rifleForm.roundCount)
-      : 0;
+    const rifle: Rifle = {
+      ...(this.editingRifle || {}),
+      ...this.rifleForm,
+      id:
+        this.editingRifle?.id ??
+        (this.rifleForm.id as any) ??
+        this.generateId('rifle'),
+      loads: existingLoads,
+      roundCount,
+    } as Rifle;
 
-    if (this.editingRifle) {
-      const updated: Rifle = {
-        id: this.editingRifle.id,
-        name: this.rifleForm.name!,
-        caliber: this.rifleForm.caliber!,
-        barrelLength: this.rifleForm.barrelLength ?? null,
-        barrelUnit: (this.rifleForm.barrelUnit as 'cm' | 'inch') ?? 'cm',
-        twistRate: this.rifleForm.twistRate || '',
-        muzzleVelocityFps: this.rifleForm.muzzleVelocityFps ?? null,
-        scopeUnit: (this.rifleForm.scopeUnit as ScopeUnit) ?? 'MIL',
-        bulletBc: this.rifleForm.bulletBc || '',
-        bulletWeightGr: this.rifleForm.bulletWeightGr ?? null,
-        bulletName: this.rifleForm.bulletName || '',
-        notes: this.rifleForm.notes,
-        roundCount,
-        loads: normalizedLoads
-      };
-      this.data.updateRifle(updated);
+    if (isEditing) {
+      if ((this.data as any).updateRifle) {
+        (this.data as any).updateRifle(rifle);
+      }
     } else {
-      const toAdd: Omit<Rifle, 'id'> = {
-        name: this.rifleForm.name!,
-        caliber: this.rifleForm.caliber!,
-        barrelLength: this.rifleForm.barrelLength ?? null,
-        barrelUnit: (this.rifleForm.barrelUnit as 'cm' | 'inch') ?? 'cm',
-        twistRate: this.rifleForm.twistRate || '',
-        muzzleVelocityFps: this.rifleForm.muzzleVelocityFps ?? null,
-        scopeUnit: (this.rifleForm.scopeUnit as ScopeUnit) ?? 'MIL',
-        bulletBc: this.rifleForm.bulletBc || '',
-        bulletWeightGr: this.rifleForm.bulletWeightGr ?? null,
-        bulletName: this.rifleForm.bulletName || '',
-        notes: this.rifleForm.notes,
-        roundCount,
-        loads: normalizedLoads
-      };
-      this.data.addRifle(toAdd);
+      if ((this.data as any).addRifle) {
+        (this.data as any).addRifle(rifle);
+      } else if ((this.data as any).setRifles) {
+        const rifles = [...this.rifles, rifle];
+        (this.data as any).setRifles(rifles);
+      }
     }
 
     this.clearRifleForm();
-    this.addFormVisible = false;
     this.refresh();
+    this.selectedRifleId = rifle.id!;
   }
 
-  deleteRifle(r: Rifle) {
-    if (!confirm(`Delete rifle "${r.name}"?`)) return;
-    this.data.deleteRifle(r.id);
-    this.refresh();
-  }
+  deleteRifle(r: Rifle): void {
+    if (!confirm('Delete this rifle and all its loads?')) return;
 
-  // ---------- Load data management ----------
-
-  toggleLoads(r: Rifle) {
-    if (this.activeLoadsRifleId === r.id) {
-      this.activeLoadsRifleId = null;
-      this.editingLoadId = null;
-      this.resetLoadForm();
-      return;
+    if ((this.data as any).deleteRifle) {
+      (this.data as any).deleteRifle(r);
+    } else if ((this.data as any).setRifles) {
+      const rifles = this.rifles.filter((x) => x.id !== r.id);
+      (this.data as any).setRifles(rifles);
     }
-    this.activeLoadsRifleId = r.id;
+
+    this.refresh();
+
+    if (this.rifles.length) {
+      this.selectedRifleId = this.rifles[0].id!;
+    } else {
+      this.selectedRifleId = null;
+    }
+
+    this.activeLoadsRifleId = null;
+    this.activeLoadFormRifleId = null;
     this.editingLoadId = null;
     this.resetLoadForm();
   }
 
-  resetLoadForm() {
-    this.loadForm = {
-      powder: '',
-      chargeGn: null as any,
-      coal: '',
-      primer: ''
-    };
+  // --- Loads visibility -------------------------------------------------
+
+  toggleLoads(r: Rifle): void {
+    if (this.activeLoadsRifleId === r.id) {
+      // collapse
+      this.activeLoadsRifleId = null;
+      this.activeLoadFormRifleId = null;
+      this.editingLoadId = null;
+      this.resetLoadForm();
+    } else {
+      // expand loads table but do NOT auto-open add/edit form
+      this.activeLoadsRifleId = r.id!;
+    }
+  }
+
+  toggleLoadForm(rifleId: string | number): void {
+    if (this.activeLoadFormRifleId === rifleId) {
+      // collapse form
+      this.activeLoadFormRifleId = null;
+      this.editingLoadId = null;
+      this.resetLoadForm();
+    } else {
+      // open form for this rifle
+      this.activeLoadFormRifleId = rifleId;
+      if (!this.editingLoadId) {
+        this.resetLoadForm();
+      }
+    }
+  }
+
+  // --- Load form logic --------------------------------------------------
+
+  resetLoadForm(): void {
+    this.loadForm = {};
     this.editingLoadId = null;
   }
 
-  getLoadsForRifle(r: Rifle): RifleLoad[] {
-    return r.loads || [];
-  }
-
-  editLoad(r: Rifle, load: RifleLoad) {
-    this.activeLoadsRifleId = r.id;
-    this.editingLoadId = load.id;
-    this.loadForm = { ...load };
-  }
-
-  saveLoad(r: Rifle) {
-    if (!this.loadForm.powder || this.loadForm.chargeGn == null) {
-      alert('Powder and charge are required.');
-      return;
-    }
-
+  saveLoad(r: Rifle): void {
     const loads = [...(r.loads || [])];
 
     if (this.editingLoadId != null) {
-      const idx = loads.findIndex(l => l.id === this.editingLoadId);
-      if (idx >= 0) {
+      // update existing
+      const idx = loads.findIndex((l) => l.id === this.editingLoadId);
+      if (idx !== -1) {
         loads[idx] = {
+          ...loads[idx],
+          ...this.loadForm,
           id: this.editingLoadId,
-          powder: this.loadForm.powder!,
-          chargeGn: Number(this.loadForm.chargeGn),
-          coal: this.loadForm.coal || '',
-          primer: this.loadForm.primer || ''
-        };
+          chargeGn:
+            this.loadForm.chargeGn != null
+              ? Number(this.loadForm.chargeGn)
+              : loads[idx].chargeGn,
+          bulletWeightGr:
+            this.loadForm.bulletWeightGr != null
+              ? Number(this.loadForm.bulletWeightGr)
+              : loads[idx].bulletWeightGr,
+        } as RifleLoad;
       }
     } else {
-      const newId =
-        loads.length > 0 ? Math.max(...loads.map(l => l.id)) + 1 : 1;
-      loads.push({
-        id: newId,
-        powder: this.loadForm.powder!,
-        chargeGn: Number(this.loadForm.chargeGn),
+      // add new
+      const newLoad: RifleLoad = {
+        id:
+          (this.loadForm.id as any) ??
+          this.generateId('load'),
+        powder: this.loadForm.powder || '',
+        chargeGn:
+          this.loadForm.chargeGn != null
+            ? Number(this.loadForm.chargeGn)
+            : 0,
         coal: this.loadForm.coal || '',
-        primer: this.loadForm.primer || ''
-      });
+        primer: this.loadForm.primer || '',
+        bullet: this.loadForm.bullet,
+        bulletWeightGr:
+          this.loadForm.bulletWeightGr != null
+            ? Number(this.loadForm.bulletWeightGr)
+            : undefined,
+        bulletBc: this.loadForm.bulletBc,
+      } as RifleLoad;
+
+      loads.push(newLoad);
     }
 
-    const updatedRifle: Rifle = { ...r, loads };
-    this.data.updateRifle(updatedRifle);
+    const updatedRifle: Rifle = {
+      ...r,
+      loads,
+    };
+
+    if ((this.data as any).updateRifle) {
+      (this.data as any).updateRifle(updatedRifle);
+    } else if ((this.data as any).setRifles) {
+      const rifles = this.rifles.map((x) =>
+        x.id === updatedRifle.id ? updatedRifle : x
+      );
+      (this.data as any).setRifles(rifles);
+    }
+
     this.refresh();
-
-    // keep loads panel open
-    const updated = this.rifles.find(x => x.id === r.id);
-    if (updated) {
-      this.activeLoadsRifleId = updated.id;
-    }
+    this.activeLoadsRifleId = updatedRifle.id!;
     this.resetLoadForm();
+    this.editingLoadId = null;
   }
 
-  deleteLoad(r: Rifle, load: RifleLoad) {
+  editLoad(r: Rifle, load: RifleLoad): void {
+    this.activeLoadsRifleId = r.id!;
+    this.activeLoadFormRifleId = r.id!;
+    this.editingLoadId = load.id as any;
+
+    this.loadForm = {
+      id: load.id,
+      powder: load.powder,
+      chargeGn: load.chargeGn,
+      coal: load.coal,
+      primer: load.primer,
+      bullet: load.bullet,
+      bulletWeightGr: load.bulletWeightGr,
+      bulletBc: load.bulletBc,
+    };
+  }
+
+  deleteLoad(r: Rifle, load: RifleLoad): void {
     if (!confirm('Delete this load?')) return;
-    const loads = (r.loads || []).filter(l => l.id !== load.id);
+
+    const loads = (r.loads || []).filter((l) => l.id !== load.id);
     const updatedRifle: Rifle = { ...r, loads };
-    this.data.updateRifle(updatedRifle);
+
+    if ((this.data as any).updateRifle) {
+      (this.data as any).updateRifle(updatedRifle);
+    } else if ((this.data as any).setRifles) {
+      const rifles = this.rifles.map((x) =>
+        x.id === updatedRifle.id ? updatedRifle : x
+      );
+      (this.data as any).setRifles(rifles);
+    }
+
     this.refresh();
-    this.activeLoadsRifleId = r.id;
+    this.activeLoadsRifleId = r.id!;
+    this.activeLoadFormRifleId = r.id!;
+    this.editingLoadId = null;
+    this.resetLoadForm();
   }
 }

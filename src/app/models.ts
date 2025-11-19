@@ -1,9 +1,14 @@
+// ---------------- Rifles & loads ----------------
+
 export interface RifleLoad {
   id: number;
   powder: string;
   chargeGn: number;
   coal: string;
   primer: string;
+  bullet?: string;
+  bulletWeightGr?: number;
+  bulletBc?: string;
 }
 
 export type ScopeUnit = 'MIL' | 'MOA';
@@ -17,13 +22,12 @@ export interface Rifle {
   twistRate: string;
   muzzleVelocityFps: number | null;
   scopeUnit: ScopeUnit;
-  bulletBc: string;
-  bulletWeightGr: number | null;
-  bulletName: string;
   notes?: string;
-  roundCount?: number;       // total rounds through this rifle
+  roundCount?: number;        // total rounds through this rifle
   loads: RifleLoad[];
 }
+
+// ---------------- Venues & sub-ranges ----------------
 
 export interface SubRange {
   id: number;
@@ -40,22 +44,46 @@ export interface Venue {
   subRanges: SubRange[];
 }
 
+// ---------------- Environment & DOPE ----------------
+
 export interface Environment {
+  // basic conditions
   temperatureC?: number;
-  pressureHpa?: number;
-  humidityPercent?: number;
+
+  // match what session-tab & history-tab are using
+  pressureHpa?: number;         // hPa
+  humidityPercent?: number;     // %
+
   densityAltitudeM?: number;
-  windSpeedMps?: number;        // currently used as mph in UI
-  windDirectionDeg?: number;    // derived from wind clock
-  lightConditions?: string;
+  windSpeedMps?: number;
+  windDirectionClock?: number;  // 0–12 o’clock (clock system)
+  windDirectionDeg?: number;    // 0–360 degrees
+
+  // used in history / session templates
+  lightConditions?: string;     // e.g. "overcast", "late afternoon"
+
+  notes?: string;
 }
 
 export interface DistanceDope {
-  subRangeId?: number;
+  id?: number;                  // optional so we can create rows before persisting
+  subRangeId?: number;          // used by session-tab when mapping distances
+
   distanceM: number;
+
+  // click-based DOPE (what you’re editing in history/session)
+  elevationClicks?: number;
+  windClicks?: number;
+
+  // MIL-based columns used in history-tab (keep them optional)
   elevationMil?: number;
   windageMil?: number;
+
+  // descriptive notes for where the shots landed
   impactsDescription?: string;
+
+  windDirectionClock?: number;
+  notes?: string;
 }
 
 export interface Session {
@@ -70,9 +98,7 @@ export interface Session {
   completed?: boolean;
 }
 
-/* ============================
-   Load development models
-   ============================ */
+// ---------------- Load development ----------------
 
 export type LoadDevType = 'ladder' | 'ocw' | 'groups';
 
@@ -80,28 +106,29 @@ export type GroupSizeUnit = 'MOA' | 'mm';
 
 export interface LoadDevEntry {
   id: number;
-  // Nest inside project, no need for projectId field here
-  loadLabel: string;         // e.g. "42.3 gr N570 / 140 ELD-M / 2.810"
+  // nested under project; no projectId needed
+  loadLabel: string;          // e.g. "42.3 gr N570 140 ELD-M"
   powder?: string;
   chargeGr?: number;
   coal?: string;
   primer?: string;
   bullet?: string;
   bulletWeightGr?: number;
+  bulletBc?: string;          // G7/G1 BC for this load
   distanceM?: number;
   shotsFired?: number;
   groupSize?: number;
   groupUnit?: GroupSizeUnit;
-  poiNote?: string;          // POI relative to aim, free text
+  poiNote?: string;           // POI description
   notes?: string;
 }
 
 export interface LoadDevProject {
   id: number;
   rifleId: number;
-  name: string;              // "N570 6.5 CM ladder 2025-01"
+  name: string;               // "N570 OCW Dec 2025"
   type: LoadDevType;
-  dateStarted: string;       // ISO string
+  dateStarted: string;        // ISO string
   notes?: string;
   entries: LoadDevEntry[];
 }

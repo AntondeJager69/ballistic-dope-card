@@ -299,7 +299,7 @@
       </div>
     </details>
 
-    <!-- PLANNER PANEL (still separate, can later also be details if you like) -->
+    <!-- PLANNER PANEL -->
     <div *ngIf="isPlannerVisible" class="mt-2 rounded-xl bg-black/80 border border-gray-700">
       <button
         type="button"
@@ -423,8 +423,15 @@
           class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
       </label>
 
-      <label class="flex flex-col">Bullet weight
+      <label class="flex flex-col">Bullet weight (gr)
         <input type="number" [(ngModel)]="entryForm.bulletWeightGr"
+          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+      </label>
+
+      <!-- ✅ New BC field -->
+      <label class="flex flex-col">BC (G7)
+        <input [(ngModel)]="entryForm.bulletBc"
+          placeholder="e.g. 0.345"
           class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
       </label>
 

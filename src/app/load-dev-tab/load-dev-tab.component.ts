@@ -25,6 +25,7 @@ interface EntryForm {
   primer: string;
   bullet: string;
   bulletWeightGr: number | null;
+  bulletBc: string;                 // ✅ BC per entry
   distanceM: number | null;
   shotsFired: number | null;
   groupSize: number | null;
@@ -83,7 +84,7 @@ export class LoadDevTabComponent implements OnInit {
 
   entrySortMode: EntrySortMode = 'chargeAsc';
 
-  // collapsible panels inside the project view
+  // legacy flags (results panel now uses <details>; planner still uses this)
   resultsPanelOpen = true;
   plannerPanelOpen = false;
 
@@ -105,7 +106,7 @@ export class LoadDevTabComponent implements OnInit {
     return {
       rifleId: null,
       name: '',
-      type: 'ladder' as LoadDevType,
+      type: 'ladder',
       notes: ''
     };
   }
@@ -119,6 +120,7 @@ export class LoadDevTabComponent implements OnInit {
       primer: '',
       bullet: '',
       bulletWeightGr: null,
+      bulletBc: '',            // ✅ default BC empty
       distanceM: null,
       shotsFired: null,
       groupSize: null,
@@ -208,7 +210,7 @@ export class LoadDevTabComponent implements OnInit {
     this.editingProject = null;
     this.projectForm = this.createEmptyProjectForm();
     this.projectForm.rifleId = this.selectedRifleId;
-    this.projectForm.type = 'ladder' as LoadDevType;
+    this.projectForm.type = 'ladder';
     this.projectFormVisible = true;
   }
 
@@ -291,7 +293,6 @@ export class LoadDevTabComponent implements OnInit {
 
   // ---------------- planner: ladder / OCW range ----------------
 
-  /** MUST be public because the template calls it */
   resetPlannerForProject(): void {
     const p = this.selectedProject;
     const defaults = this.createEmptyPlannerForm();
@@ -445,9 +446,12 @@ export class LoadDevTabComponent implements OnInit {
     const entries = this.selectedProject.entries;
     if (entries && entries.length > 0) {
       const last = entries[entries.length - 1];
+      const anyLast = last as any;
+
       this.entryForm.powder = last.powder ?? '';
       this.entryForm.bullet = last.bullet ?? '';
       this.entryForm.bulletWeightGr = last.bulletWeightGr ?? null;
+      this.entryForm.bulletBc = anyLast.bulletBc || '';   // ✅ carry BC forward
       this.entryForm.coal = last.coal ?? '';
       this.entryForm.primer = last.primer ?? '';
       this.entryForm.distanceM = last.distanceM ?? null;
@@ -470,6 +474,7 @@ export class LoadDevTabComponent implements OnInit {
       primer: entry.primer ?? '',
       bullet: entry.bullet ?? '',
       bulletWeightGr: entry.bulletWeightGr ?? null,
+      bulletBc: anyEntry.bulletBc || '',           // ✅ read BC from entry
       distanceM: entry.distanceM ?? null,
       shotsFired: entry.shotsFired ?? null,
       groupSize: entry.groupSize ?? null,
@@ -493,6 +498,7 @@ export class LoadDevTabComponent implements OnInit {
       primer: entry.primer,
       bullet: entry.bullet,
       bulletWeightGr: entry.bulletWeightGr,
+      bulletBc: anyEntry.bulletBc,                // ✅ clone BC
       distanceM: entry.distanceM,
       shotsFired: entry.shotsFired,
       groupSize: entry.groupSize,
@@ -537,6 +543,7 @@ export class LoadDevTabComponent implements OnInit {
       primer: this.entryForm.primer.trim() || undefined,
       bullet: this.entryForm.bullet.trim() || undefined,
       bulletWeightGr: this.entryForm.bulletWeightGr ?? undefined,
+      bulletBc: this.entryForm.bulletBc.trim() || undefined,   // ✅ save BC
       distanceM: this.entryForm.distanceM ?? undefined,
       shotsFired: this.entryForm.shotsFired ?? undefined,
       groupSize: this.entryForm.groupSize ?? undefined,

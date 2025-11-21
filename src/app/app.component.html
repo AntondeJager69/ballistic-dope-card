@@ -44,9 +44,88 @@
             (click)="openReports()">
             Reports
           </button>
+
+          <!-- ROUND KESTREL BUTTON (below Reports) -->
+          <div class="flex flex-col items-center mt-8">
+            <button
+              class="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+              [ngClass]="{
+                'bg-orange-500 hover:scale-105': !kestrelIsConnecting && !kestrelError && !kestrelData,
+                'bg-blue-500 animate-pulse': kestrelIsConnecting,
+                'bg-green-600 hover:scale-105': !kestrelIsConnecting && kestrelData && !kestrelError,
+                'bg-red-600': kestrelError
+              }"
+              (click)="startQuickKestrelReading()"
+              [disabled]="kestrelIsConnecting">
+
+              <!-- Simple "Kestrel" SVG icon -->
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                class="w-6 h-6">
+                <!-- outer ring -->
+                <circle cx="12" cy="12" r="9" class="fill-black/40" />
+                <!-- vane / prop style blades -->
+                <path
+                  class="fill-white"
+                  d="M12 4.5c.6 0 1 .4 1 1v4.1l3.1-1.8a1 1 0 0 1 1 1.7l-3.1 1.8 3.1 1.8a1 1 0 1 1-1 1.7L13 13.3v4.2a1 1 0 0 1-2 0v-4.2l-3.1 1.8a1 1 0 1 1-1-1.7l3.1-1.8-3.1-1.8a1 1 0 0 1 1-1.7L11 9.6V5.5c0-.6.4-1 1-1Z" />
+              </svg>
+            </button>
+
+            <!-- Label under button with subtle underline effect -->
+            <span
+              class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
+              Kestrel quick env
+            </span>
+
+            <!-- Tiny status line -->
+            <span class="text-[9px] mt-0.5"
+                  [ngClass]="kestrelError ? 'text-red-400' : 'text-gray-400'">
+              {{ kestrelStatus }}
+            </span>
+
+            <!-- "Tap to refresh" hint -->
+            <span class="text-[9px] text-gray-500 italic mt-0.5">
+              Tap icon to refresh reading
+            </span>
+
+            <!-- Small last-update time -->
+            <span class="text-[9px] text-gray-500 mt-0.5" *ngIf="kestrelLastUpdate">
+              {{ kestrelLastUpdate | date:'shortTime' }}
+            </span>
+
+            <!-- Very compact readings grid -->
+            <div *ngIf="kestrelData"
+                 class="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9px] text-gray-300 text-left">
+              <div>
+                Temp:
+                <span class="font-semibold">
+                  {{ kestrelData.temperatureC | number:'1.1-1' }}°C
+                </span>
+              </div>
+              <div>
+                Hum:
+                <span class="font-semibold">
+                  {{ kestrelData.humidityPercent | number:'1.0-1' }}%
+                </span>
+              </div>
+              <div>
+                Press:
+                <span class="font-semibold">
+                  {{ kestrelData.pressureHpa | number:'1.1-1' }} hPa
+                </span>
+              </div>
+              <div>
+                Wind:
+                <span class="font-semibold">
+                  {{ kestrelData.windSpeedMph | number:'1.1-1' }} mph
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- Simple Reports mini-wizard -->
+        <!-- Reports mini-wizard -->
         <div *ngIf="showReportsForm" class="bg-gray-900 rounded-2xl p-4 shadow space-y-2">
           <h3 class="text-sm font-semibold">Reports – what do you need?</h3>
           <p class="text-[11px] text-gray-300">
@@ -114,8 +193,7 @@
     </div>
 
     <!-- Bottom tab bar (inside the phone frame) -->
-    <div
-      class="mt-2 bg-black/95 border-t border-gray-800 py-2">
+    <div class="mt-2 bg-black/95 border-t border-gray-800 py-2">
       <div class="flex justify-between text-[11px]">
 
         <!-- Menu -->
@@ -183,7 +261,7 @@
           </span>
         </button>
 
-        <!-- Load dev (optional bottom tab) -->
+        <!-- Load dev -->
         <button
           class="flex-1 flex flex-col items-center"
           (click)="setTab('loaddev')">

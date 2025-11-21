@@ -41,7 +41,7 @@ export class AppComponent {
   // Basic app info
   appTitle = 'Gunstuff Ballistics';
   appSubtitle = 'ELR / Precision shooting logbook';
-  appVersion = '1.0.0';
+  appVersion = '1.0.9';
 
   // Tabs
   currentTab: AppTab = 'menu';
@@ -255,7 +255,7 @@ export class AppComponent {
         }
       );
 
-      const timeoutMs = 8000;
+      const timeoutMs = 15000;
       const start = Date.now();
       while (!foundDevice && Date.now() - start < timeoutMs) {
         await this.sleep(400);

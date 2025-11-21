@@ -8,350 +8,278 @@
     <div>•</div>
     <div [class.font-semibold]="step === 'shots'">3. Shot plan</div>
     <div>•</div>
-    <div [class.font-semibold]="step === 'complete'">4. Go shoot</div>
+    <div [class.font-semibold]="step === 'complete'">4. Complete</div>
   </div>
 
-  <!-- STEP 1: SETUP -->
+  <!-- ========================================================= -->
+  <!-- STEP 1 — SETUP                                            -->
+  <!-- ========================================================= -->
   <div *ngIf="step === 'setup'" class="space-y-3">
     <div class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
+
       <h2 class="text-sm font-semibold mb-1">Setup</h2>
 
       <label class="flex flex-col">
         Session title
-        <input
-          [(ngModel)]="title"
-          name="title"
-          placeholder="Match name, load test, etc."
-          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+        <input [(ngModel)]="title"
+               name="title"
+               placeholder="Match name, load test, etc."
+               class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
       </label>
 
       <div class="grid grid-cols-2 gap-2">
+
+        <!-- Rifle -->
         <label class="flex flex-col">
           Rifle
-          <select
-            [(ngModel)]="selectedRifleId"
-            name="rifle"
-            class="mt-1 px-2 py-1 rounded bg-black border border-gray-700">
+          <select [(ngModel)]="selectedRifleId"
+                  name="rifle"
+                  class="mt-1 px-2 py-1 rounded bg-black border border-gray-700">
             <option [ngValue]="null">Select rifle</option>
             <option *ngFor="let r of rifles" [ngValue]="r.id">
               {{ r.name }} ({{ r.caliber }})
             </option>
           </select>
-          <span *ngIf="rifles.length === 0" class="text-[10px] text-orange-400 mt-1">
+          <span *ngIf="rifles.length === 0"
+                class="text-[10px] text-orange-400 mt-1">
             No rifles saved yet. Add one on the Rifles tab.
           </span>
         </label>
 
+        <!-- Venue -->
         <label class="flex flex-col">
           Venue
-          <select
-            [(ngModel)]="selectedVenueId"
-            name="venue"
-            (ngModelChange)="onVenueChange()"
-            class="mt-1 px-2 py-1 rounded bg-black border border-gray-700">
+          <select [(ngModel)]="selectedVenueId"
+                  name="venue"
+                  (ngModelChange)="onVenueChange()"
+                  class="mt-1 px-2 py-1 rounded bg-black border border-gray-700">
             <option [ngValue]="null">Select venue</option>
             <option *ngFor="let v of venues" [ngValue]="v.id">
               {{ v.name }}
             </option>
           </select>
-          <span *ngIf="venues.length === 0" class="text-[10px] text-orange-400 mt-1">
+          <span *ngIf="venues.length === 0"
+                class="text-[10px] text-orange-400 mt-1">
             No venues saved yet. Add one on the Venues tab.
           </span>
         </label>
       </div>
 
+      <!-- Subrange -->
       <label class="flex flex-col">
         Sub-range
-        <select
-          [(ngModel)]="selectedSubRangeId"
-          name="subrange"
-          (ngModelChange)="onSubRangeChange()"
-          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700">
+        <select [(ngModel)]="selectedSubRangeId"
+                name="subrange"
+                (ngModelChange)="onSubRangeChange()"
+                class="mt-1 px-2 py-1 rounded bg-black border border-gray-700">
           <option [ngValue]="null">Select sub-range</option>
           <option *ngFor="let sr of subRanges" [ngValue]="sr.id">
             {{ sr.name }} ({{ sr.distancesM.join(', ') }} m)
           </option>
         </select>
-        <span *ngIf="subRanges.length === 0 && selectedVenue"
-          class="text-[10px] text-orange-400 mt-1">
-          This venue has no sub-ranges yet. Edit it on the Venues tab.
-        </span>
       </label>
 
       <div class="flex justify-end mt-2">
-        <button
-          class="px-4 py-1.5 text-xs rounded bg-orange-500 text-black font-semibold"
-          (click)="nextFromSetup()">
+        <button class="px-4 py-1.5 text-xs rounded bg-orange-500 text-black font-semibold"
+                (click)="nextFromSetup()">
           Next: Environment
         </button>
       </div>
     </div>
   </div>
 
-  <!-- STEP 2: ENVIRONMENT -->
+  <!-- ========================================================= -->
+  <!-- STEP 2 — ENVIRONMENT                                      -->
+  <!-- ========================================================= -->
   <div *ngIf="step === 'environment'" class="space-y-3">
 
-    <!-- Kestrel Integration -->
-   <!-- Kestrel Integration -->
-<div class="bg-slate-800/80 rounded-2xl p-3 border border-slate-700 shadow-sm">
-  <div class="flex items-center justify-between mb-2">
-    <div>
+    <!-- Kestrel Card -->
+    <div class="bg-slate-800/80 rounded-2xl p-3 border border-slate-700 shadow-sm">
       <h3 class="text-sm font-semibold text-orange-400 tracking-wide">
         Kestrel integration
       </h3>
+
       <p class="text-[11px] text-slate-300/80">
-        Connect to a Kestrel LiNK device or use demo data.
+        Connect to a Kestrel LiNK device or add MANUALLY below.
       </p>
+
+      <button type="button"
+              class="w-full px-3 py-1.5 mt-3 text-xs font-semibold rounded-full bg-orange-500 hover:bg-orange-400 text-slate-900 shadow-sm transition disabled:opacity-60 disabled:cursor-not-allowed"
+              (click)="connectKestrelBluetooth()"
+              [disabled]="kestrelIsConnecting">
+        <span *ngIf="!kestrelIsConnecting">Connect via Bluetooth</span>
+        <span *ngIf="kestrelIsConnecting">Connecting…</span>
+      </button>
+
+      <p class="text-[11px] text-slate-300 mt-2">
+        Status:
+        <span [ngClass]="{ 'text-green-400': kestrelConnected }">
+          {{ kestrelStatus }}
+        </span>
+      </p>
+
+      <p *ngIf="kestrelError" class="text-[10px] text-red-400">
+        {{ kestrelError }}
+      </p>
+
+      <p *ngIf="kestrelLastUpdate" class="text-[10px] text-slate-400 mt-1">
+        Last update: {{ kestrelLastUpdate | date:'short' }}
+      </p>
+
     </div>
-  </div>
 
-  <div class="flex gap-2 mb-2">
-    <button
-      type="button"
-      class="flex-1 px-3 py-1.5 text-xs font-semibold rounded-full bg-orange-500 hover:bg-orange-400 text-slate-900 shadow-sm transition disabled:opacity-60 disabled:cursor-not-allowed"
-      (click)="connectKestrelBluetooth()"
-      [disabled]="kestrelIsConnecting"
-    >
-      <span *ngIf="!kestrelIsConnecting">Connect via Bluetooth</span>
-      <span *ngIf="kestrelIsConnecting">Connecting…</span>
-    </button>
-
-    <button
-      type="button"
-      class="px-3 py-1.5 text-xs font-semibold rounded-full bg-slate-700 hover:bg-slate-600 text-slate-100 shadow-sm transition"
-      (click)="mockReadFromKestrel()"
-    >
-      Use demo data
-    </button>
-  </div>
-
-  <p class="text-[11px] text-slate-300 mb-1">
-    Status:
-    <span
-      class="font-medium"
-      [ngClass]="{
-        'text-green-400': kestrelConnected,
-        'text-slate-200': !kestrelConnected
-      }"
-    >
-      {{ kestrelStatus }}
-    </span>
-  </p>
-
-  <p *ngIf="kestrelError" class="text-[10px] text-red-400 mb-1">
-    {{ kestrelError }}
-  </p>
-
-  <p *ngIf="kestrelLastUpdate" class="text-[10px] text-slate-400 mb-2">
-    Last update: {{ kestrelLastUpdate | date:'short' }}
-  </p>
-
-  <div *ngIf="kestrelData" class="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-100">
-    <div class="bg-slate-900/70 rounded-lg px-2 py-1.5">
-      <div class="text-[10px] text-slate-400 uppercase tracking-wide">Temp</div>
-      <div class="font-semibold">{{ kestrelData.temperatureC }} °C</div>
-    </div>
-    <div class="bg-slate-900/70 rounded-lg px-2 py-1.5">
-      <div class="text-[10px] text-slate-400 uppercase tracking-wide">Humidity</div>
-      <div class="font-semibold">{{ kestrelData.humidityPercent }} %</div>
-    </div>
-    <div class="bg-slate-900/70 rounded-lg px-2 py-1.5">
-      <div class="text-[10px] text-slate-400 uppercase tracking-wide">Pressure</div>
-      <div class="font-semibold">{{ kestrelData.pressureHpa }} hPa</div>
-    </div>
-    <div class="bg-slate-900/70 rounded-lg px-2 py-1.5">
-      <div class="text-[10px] text-slate-400 uppercase tracking-wide">Wind</div>
-      <div class="font-semibold">{{ kestrelData.windSpeedMph }} mph</div>
-    </div>
-  </div>
-
-  <p class="mt-2 text-[10px] text-slate-400">
-    Bluetooth values are experimental and based on NK docs. If numbers look wrong,
-    we can refine the byte mapping using your exact Kestrel model.
-  </p>
-</div>
-
-
-
-    <!-- Manual environment entry -->
+    <!-- Manual Environment -->
     <div class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
       <h2 class="text-sm font-semibold mb-1">Environment (before shooting)</h2>
 
       <div class="grid grid-cols-2 gap-2">
+
         <label class="flex flex-col">
           Temp (°C)
-          <input
-            type="number"
-            [(ngModel)]="environment.temperatureC"
-            name="temp"
-            class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+          <input type="number"
+                 [(ngModel)]="environment.temperatureC"
+                 class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
         </label>
 
         <label class="flex flex-col">
           Pressure (hPa)
-          <input
-            type="number"
-            [(ngModel)]="environment.pressureHpa"
-            name="pressure"
-            class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+          <input type="number"
+                 [(ngModel)]="environment.pressureHpa"
+                 class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
         </label>
 
         <label class="flex flex-col">
           Humidity (%)
-          <input
-            type="number"
-            [(ngModel)]="environment.humidityPercent"
-            name="humidity"
-            class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+          <input type="number"
+                 [(ngModel)]="environment.humidityPercent"
+                 class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
         </label>
 
         <label class="flex flex-col">
           DA (m)
-          <input
-            type="number"
-            [(ngModel)]="environment.densityAltitudeM"
-            name="da"
-            placeholder="Optional"
-            class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+          <input type="number"
+                 [(ngModel)]="environment.densityAltitudeM"
+                 class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
         </label>
 
         <label class="flex flex-col">
           Wind speed (mph)
-          <input
-            type="number"
-            [(ngModel)]="environment.windSpeedMps"
-            name="windSpeed"
-            class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+          <input type="number"
+                 [(ngModel)]="environment.windSpeedMps"
+                 class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
         </label>
 
         <label class="flex flex-col">
           Wind from (o'clock)
-          <input
-            type="number"
-            min="1"
-            max="12"
-            [(ngModel)]="windClock"
-            name="windClock"
-            class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
-          <span class="text-[10px] text-gray-400 mt-1">
-            12 = from target (headwind), 6 = from behind (tailwind), 3 = from right, 9 = from left.
-          </span>
+          <input type="number"
+                 min="1"
+                 max="12"
+                 [(ngModel)]="windClock"
+                 class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
         </label>
-
-        <!-- Wind hint -->
-        <div *ngIf="windHint" class="col-span-2 text-[10px] text-orange-400 mt-1">
-          {{ windHint }}
-        </div>
+      </div>
+      <!-- Wind hint / ballistic effect -->
+      <div *ngIf="windHint"
+           class="col-span-2 text-[10px] text-orange-400 mt-1">
+        {{ windHint }}
       </div>
 
       <label class="flex flex-col mt-1">
         Light conditions
-        <input
-          [(ngModel)]="environment.lightConditions"
-          name="light"
-          placeholder="Overcast, full sun, mirage, etc."
-          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
+        <input [(ngModel)]="environment.lightConditions"
+               placeholder="Overcast, mirage, etc."
+               class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
       </label>
 
       <div class="flex justify-between mt-2">
-        <button
-          class="px-3 py-1.5 text-xs rounded bg-gray-700"
-          (click)="backToSetup()">
+        <button class="px-3 py-1.5 text-xs rounded bg-gray-700"
+                (click)="backToSetup()">
           Back
         </button>
-        <button
-          class="px-4 py-1.5 text-xs rounded bg-orange-500 text-black font-semibold"
-          (click)="nextFromEnvironment()">
+        <button class="px-4 py-1.5 text-xs rounded bg-orange-500 text-black font-semibold"
+                (click)="nextFromEnvironment()">
           Next: Shot plan
         </button>
       </div>
     </div>
   </div>
 
-  <!-- STEP 3: SHOT PLAN -->
+  <!-- ========================================================= -->
+  <!-- STEP 3 — SHOT PLAN                                        -->
+  <!-- ========================================================= -->
   <div *ngIf="step === 'shots'" class="space-y-3">
+
     <div class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
-      <h2 class="text-sm font-semibold mb-1">Shot plan (before shooting)</h2>
 
-      <label class="flex flex-col">
-        Shots planned (total)
-        <input
-          type="number"
-          [(ngModel)]="shotCount"
-          name="shotCount"
-          placeholder="Optional"
-          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
-      </label>
+      <h2 class="text-sm font-semibold mb-2">Shot plan</h2>
 
-      <div class="mt-2">
-        <div class="text-[11px] font-semibold mb-1">
-          Distances (m) – tap to select
-        </div>
-        <div *ngIf="distanceOptions.length === 0" class="text-[11px] text-orange-400">
-          No distances found for this sub-range. Edit the venue to add them.
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <button
-            *ngFor="let d of distanceOptions"
-            type="button"
-            (click)="toggleDistance(d)"
-            class="px-3 py-1 rounded-full border text-[11px]"
-            [class.bg-orange-500]="selectedDistances.includes(d)"
-            [class.text-black]="selectedDistances.includes(d)"
-            [class.border-orange-500]="selectedDistances.includes(d)"
-            [class.bg-black]="!selectedDistances.includes(d)"
-            [class.text-gray-100]="!selectedDistances.includes(d)"
-            [class.border-gray-600]="!selectedDistances.includes(d)">
-            {{ d }} m
-          </button>
-        </div>
-        <div *ngIf="selectedDistances.length > 0" class="text-[11px] text-gray-300 mt-1">
-          Selected: {{ selectedDistances.join(', ') }} m
-        </div>
+      <div class="text-[11px] text-gray-300 mb-1">
+        Tap on distances to include them.
       </div>
+
+      <!-- Distance buttons -->
+      <div class="grid grid-cols-3 gap-2">
+        <button
+          *ngFor="let d of distanceOptions"
+          (click)="toggleDistance(d)"
+          class="px-3 py-2 text-xs rounded border transition"
+          [ngClass]="{
+            'bg-orange-500 text-black border-orange-400 font-semibold shadow':
+              selectedDistances.includes(d),
+            'bg-black border-gray-700 text-gray-300':
+              !selectedDistances.includes(d)
+          }"
+        >
+          {{ d }} m
+        </button>
+      </div>
+
+      <label class="flex flex-col mt-3">
+        Planned shot count (optional)
+        <input type="number"
+               [(ngModel)]="shotCount"
+               class="mt-1 px-2 py-1 rounded bg-black border border-gray-700 text-xs" />
+      </label>
 
       <label class="flex flex-col mt-2">
         Notes (optional)
         <textarea
           [(ngModel)]="notes"
           rows="2"
-          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700"></textarea>
+          class="mt-1 px-2 py-1 rounded bg-black border border-gray-700 text-xs"
+          placeholder="Mirage, wind pattern, shooter notes…"></textarea>
       </label>
 
       <div class="flex justify-between mt-3">
-        <button
-          class="px-3 py-1.5 text-xs rounded bg-gray-700"
-          (click)="backToEnvironment()">
+        <button class="px-3 py-1.5 text-xs rounded bg-gray-700"
+                (click)="backToEnvironment()">
           Back
         </button>
-        <button
-          class="px-4 py-1.5 text-xs rounded bg-orange-500 text-black font-semibold"
-          (click)="goShoot()">
-          Go shoot (save to History)
+        <button class="px-4 py-1.5 text-xs rounded bg-orange-500 text-black font-semibold"
+                (click)="goShoot()">
+          Save session
         </button>
       </div>
+
     </div>
   </div>
 
-  <!-- STEP 4: COMPLETE -->
+  <!-- ========================================================= -->
+  <!-- STEP 4 — COMPLETED                                         -->
+  <!-- ========================================================= -->
   <div *ngIf="step === 'complete'" class="space-y-3">
-    <div class="bg-gray-900 border border-orange-500/70 rounded-xl p-3 shadow space-y-2">
-      <h2 class="text-sm font-semibold">Session saved</h2>
-      <p class="text-[11px] text-gray-100">
+    <div class="bg-gray-900 rounded-xl p-4 shadow space-y-2">
+
+      <h2 class="text-sm font-semibold">Session Saved</h2>
+      <p class="text-[12px] text-green-400">
         {{ completeMessage }}
       </p>
-      <p class="text-[11px] text-gray-200">
-        When you are finished shooting, open the <strong>History</strong> tab,
-        select this session, and record your actual dope, impacts and notes.
-      </p>
 
-      <div class="flex justify-end mt-2">
-        <button
-          class="px-4 py-1.5 text-xs rounded bg-orange-500 text-black font-semibold"
-          (click)="newSession()">
-          Start new session
-        </button>
-      </div>
+      <button class="mt-3 w-full px-4 py-2 text-xs rounded bg-orange-500 text-black font-semibold"
+              (click)="newSession()">
+        Start a new session
+      </button>
     </div>
   </div>
+
 </div>

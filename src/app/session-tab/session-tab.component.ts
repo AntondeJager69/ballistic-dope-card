@@ -166,32 +166,7 @@ export class SessionTabComponent implements OnInit {
 
   // ---------- Kestrel integration ----------
 
-  // Mock reader (kept for testing without hardware)
-  mockReadFromKestrel(): void {
-    const mock: KestrelSnapshot = {
-      temperatureC: 23.7,
-      humidityPercent: 38,
-      pressureHpa: 1011.5,
-      densityAltitudeM: 1350,
-      windSpeedMph: 6.5,
-      windClock: 3 // wind from right
-    };
-
-    this.kestrelData = mock;
-    this.kestrelConnected = true;
-    this.kestrelLastUpdate = new Date();
-    this.kestrelStatus = 'Mock Kestrel data loaded';
-
-    // Push mock values into environment fields
-    this.environment.temperatureC = mock.temperatureC;
-    this.environment.humidityPercent = mock.humidityPercent;
-    this.environment.pressureHpa = mock.pressureHpa;
-    this.environment.densityAltitudeM = mock.densityAltitudeM;
-    this.environment.windSpeedMps = mock.windSpeedMph; // using mph in UI
-    this.windClock = mock.windClock;
-  }
-
-  // Real Kestrel Bluetooth connection using Capacitor BLE (Android)
+   // Real Kestrel Bluetooth connection using Capacitor BLE (Android)
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -306,7 +281,7 @@ export class SessionTabComponent implements OnInit {
       );
 
       // Wait up to 8 seconds for a match
-      const timeoutMs = 8000;
+      const timeoutMs = 10000;
       const start = Date.now();
       while (!foundDevice && Date.now() - start < timeoutMs) {
         await this.sleep(400);

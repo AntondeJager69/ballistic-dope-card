@@ -398,6 +398,7 @@ export class SessionTabComponent implements OnInit {
                 : new Uint8Array(value as any).buffer
             );
 
+
       // Byte layout (still our current best guess):
       // wind, temp, humidity, pressure – each 2 bytes, LE, x10
       const windRaw = dv.getUint16(0, true);     // m/s * 10
@@ -408,8 +409,8 @@ export class SessionTabComponent implements OnInit {
       const windMs = windRaw / 100;
       const windMph = windMs * 2.23694;
       const tempC = tempRaw / 100;
-      const humidity = rhRaw / 100;
-      const pressureHpa = pressureRaw / 100;
+      const humidity = rhRaw / 10;
+      const pressureHpa = pressureRaw / 10;
 
       console.log('Kestrel SensorMeasurements raw:', {
         windRaw,

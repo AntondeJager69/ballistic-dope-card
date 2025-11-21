@@ -19,6 +19,9 @@ interface QuickKestrelSnapshot {
   windSpeedMph: number;
 }
 
+type ConverterMode = 'milToMoa' | 'moaToMil';
+type SelectedTool = 'kestrel' | 'converter' | null;
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -43,18 +46,21 @@ export class AppComponent {
   // Tabs
   currentTab: AppTab = 'menu';
 
-  // Reports mini-wizard
+  // Reports mini-wizard (on Menu tab)
   showReportsForm = false;
   reportTopic = '';
   reportDetails = '';
 
-  // ---------------- Quick Kestrel (Main menu) ----------------
+  // Tools visibility (on Menu tab)
+  showTools = false;                 // tools card collapsed/hidden by default
+  selectedTool: SelectedTool = null; // which tool details are expanded
 
-  // Same UUIDs as in your Sessions tab
+  // ---------------- Quick Kestrel (Tools block on Menu tab) ----------------
+
   private readonly kestrelServiceUuid = '03290000-eab4-dea1-b24e-44ec023874db';
   private readonly sensorMeasurementsUuid = '03290310-eab4-dea1-b24e-44ec023874db';
 
-  kestrelStatus = 'Idle – tap to read from Kestrel.';
+  kestrelStatus = 'Idle – tap Kestrel to read environment.';
   kestrelError: string | null = null;
   kestrelIsConnecting = false;
   kestrelLastUpdate: Date | null = null;
@@ -62,6 +68,31 @@ export class AppComponent {
 
   private kestrelDeviceId: string | null = null;
   private kestrelAutoDisconnectTimer: any | null = null;
+
+  // ---------------- Mil ↔ MOA converter (Tools block) ----------------
+
+  converterMode: ConverterMode = 'milToMoa';
+  converterInput: number | null = null;
+
+  get converterOutput(): number | null {
+    if (this.converterInput === null || this.converterInput === undefined) {
+      return null;
+    }
+    const v = Number(this.converterInput);
+    if (isNaN(v)) {
+      return null;
+    }
+
+    const milToMoaFactor = 3.43774677; // 1 mil ≈ 3.4377 MOA
+    const moaToMilFactor = 1 / milToMoaFactor;
+
+    const result =
+      this.converterMode === 'milToMoa'
+        ? v * milToMoaFactor
+        : v * moaToMilFactor;
+
+    return parseFloat(result.toFixed(3));
+  }
 
   // ---------------- Tabs / menu ----------------
 
@@ -81,17 +112,49 @@ export class AppComponent {
     this.showReportsForm = !this.showReportsForm;
   }
 
+  openTools() {
+    this.showTools = !this.showTools;
+    if (!this.showTools) {
+      // collapse any open tool when tools panel is hidden
+      this.selectedTool = null;
+    }
+  }
+
   submitReportRequest() {
-    // You can persist or route this to a more advanced reporting system later.
-    // For now we just close the form.
+    // Placeholder – future: actually query history, export, etc.
     this.showReportsForm = false;
+  }
+
+  // ---------------- Tools selection handlers ----------------
+
+  onKestrelToolClick() {
+    // If Kestrel is already open, tapping closes/collapses it
+    if (this.selectedTool === 'kestrel') {
+      this.selectedTool = null;
+      return;
+    }
+
+    // Switch to Kestrel tool and start a reading
+    this.selectedTool = 'kestrel';
+    void this.startQuickKestrelReading();
+  }
+
+  onConverterToolClick() {
+    // If converter is already open, tapping closes/collapses it
+    if (this.selectedTool === 'converter') {
+      this.selectedTool = null;
+      return;
+    }
+
+    // Switch to converter tool (no extra action)
+    this.selectedTool = 'converter';
   }
 
   // ---------------- Quick Kestrel helpers ----------------
 
   resetKestrelQuick() {
     this.clearKestrelAutoDisconnect();
-    this.kestrelStatus = 'Idle – tap to read from Kestrel.';
+    this.kestrelStatus = 'Idle – tap Kestrel to read environment.';
     this.kestrelError = null;
     this.kestrelLastUpdate = null;
     this.kestrelData = null;
@@ -139,7 +202,7 @@ export class AppComponent {
     this.kestrelStatus = 'Idle – Kestrel disconnected after 1 minute.';
   }
 
-  // ---------------- Main entry: button on menu ----------------
+  // ---------------- Main entry: Kestrel reading ----------------
 
   async startQuickKestrelReading(): Promise<void> {
     // Clean previous state
@@ -205,6 +268,7 @@ export class AppComponent {
       if (!foundDevice) {
         this.kestrelStatus = 'No Kestrel found in scan.';
         this.kestrelError = 'Ensure LiNK/Bluetooth is enabled on your Kestrel.';
+        this.kestrelIsConnecting = false;
         return;
       }
 
@@ -271,7 +335,6 @@ export class AppComponent {
                 : new Uint8Array(value as any).buffer
             );
 
-      // Byte layout as used in Sessions tab
       const windRaw = dv.getUint16(0, true);     // m/s * 100
       const tempRaw = dv.getInt16(2, true);      // °C * 100
       const rhRaw = dv.getUint16(4, true);       // % * 100

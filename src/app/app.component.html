@@ -21,6 +21,7 @@
       <!-- MENU TAB -->
       <div *ngIf="currentTab === 'menu'" class="space-y-3">
 
+        <!-- Main menu card -->
         <div class="bg-gray-900 rounded-2xl p-4 shadow space-y-3">
           <h2 class="text-sm font-semibold mb-1">Main menu</h2>
 
@@ -45,84 +46,12 @@
             Reports
           </button>
 
-          <!-- ROUND KESTREL BUTTON (below Reports) -->
-          <div class="flex flex-col items-center mt-8">
-            <button
-              class="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-              [ngClass]="{
-                'bg-orange-500 hover:scale-105': !kestrelIsConnecting && !kestrelError && !kestrelData,
-                'bg-blue-500 animate-pulse': kestrelIsConnecting,
-                'bg-green-600 hover:scale-105': !kestrelIsConnecting && kestrelData && !kestrelError,
-                'bg-red-600': kestrelError
-              }"
-              (click)="startQuickKestrelReading()"
-              [disabled]="kestrelIsConnecting">
-
-              <!-- Simple "Kestrel" SVG icon -->
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                class="w-6 h-6">
-                <!-- outer ring -->
-                <circle cx="12" cy="12" r="9" class="fill-black/40" />
-                <!-- vane / prop style blades -->
-                <path
-                  class="fill-white"
-                  d="M12 4.5c.6 0 1 .4 1 1v4.1l3.1-1.8a1 1 0 0 1 1 1.7l-3.1 1.8 3.1 1.8a1 1 0 1 1-1 1.7L13 13.3v4.2a1 1 0 0 1-2 0v-4.2l-3.1 1.8a1 1 0 1 1-1-1.7l3.1-1.8-3.1-1.8a1 1 0 0 1 1-1.7L11 9.6V5.5c0-.6.4-1 1-1Z" />
-              </svg>
-            </button>
-
-            <!-- Label under button with subtle underline effect -->
-            <span
-              class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
-              Kestrel quick env
-            </span>
-
-            <!-- Tiny status line -->
-            <span class="text-[9px] mt-0.5"
-                  [ngClass]="kestrelError ? 'text-red-400' : 'text-gray-400'">
-              {{ kestrelStatus }}
-            </span>
-
-            <!-- "Tap to refresh" hint -->
-            <span class="text-[9px] text-gray-500 italic mt-0.5">
-              Tap icon to refresh reading
-            </span>
-
-            <!-- Small last-update time -->
-            <span class="text-[9px] text-gray-500 mt-0.5" *ngIf="kestrelLastUpdate">
-              {{ kestrelLastUpdate | date:'shortTime' }}
-            </span>
-
-            <!-- Very compact readings grid -->
-            <div *ngIf="kestrelData"
-                 class="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9px] text-gray-300 text-left">
-              <div>
-                Temp:
-                <span class="font-semibold">
-                  {{ kestrelData.temperatureC | number:'1.1-1' }}°C
-                </span>
-              </div>
-              <div>
-                Hum:
-                <span class="font-semibold">
-                  {{ kestrelData.humidityPercent | number:'1.0-1' }}%
-                </span>
-              </div>
-              <div>
-                Press:
-                <span class="font-semibold">
-                  {{ kestrelData.pressureHpa | number:'1.1-1' }} hPa
-                </span>
-              </div>
-              <div>
-                Wind:
-                <span class="font-semibold">
-                  {{ kestrelData.windSpeedMph | number:'1.1-1' }} mph
-                </span>
-              </div>
-            </div>
-          </div>
+          <!-- Tools & utilities button -->
+          <button
+            class="w-full px-3 py-2 rounded-xl bg-gray-700 text-sm"
+            (click)="openTools()">
+            Tools & utilities
+          </button>
         </div>
 
         <!-- Reports mini-wizard -->
@@ -164,6 +93,176 @@
             </button>
           </div>
         </div>
+
+        <!-- TOOLS BLOCK (shown only if tools button toggled on) -->
+        <div *ngIf="showTools" class="bg-gray-900 rounded-2xl p-4 shadow space-y-3">
+          <h2 class="text-sm font-semibold mb-1">Tools & utilities</h2>
+
+          <!-- Icon row: Kestrel + Converter -->
+          <div class="mt-2 flex justify-center gap-10">
+
+            <!-- Kestrel quick env -->
+            <div class="flex flex-col items-center">
+              <button
+                class="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                [ngClass]="{
+                  'bg-orange-500 hover:scale-105': !kestrelIsConnecting && !kestrelError && !kestrelData,
+                  'bg-blue-500 animate-pulse': kestrelIsConnecting,
+                  'bg-green-600 hover:scale-105': !kestrelIsConnecting && kestrelData && !kestrelError,
+                  'bg-red-600': kestrelError
+                }"
+                (click)="onKestrelToolClick()"
+                [disabled]="kestrelIsConnecting">
+
+                <!-- Simple "Kestrel" SVG icon -->
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  class="w-6 h-6">
+                  <!-- outer ring -->
+                  <circle cx="12" cy="12" r="9" class="fill-black/40" />
+                  <!-- vane / prop style blades -->
+                  <path
+                    class="fill-white"
+                    d="M12 4.5c.6 0 1 .4 1 1v4.1l3.1-1.8a1 1 0 0 1 1 1.7l-3.1 1.8 3.1 1.8a1 1 0 1 1-1 1.7L13 13.3v4.2a1 1 0 0 1-2 0v-4.2l-3.1 1.8a1 1 0 1 1-1-1.7l3.1-1.8-3.1-1.8a1 1 0 0 1 1-1.7L11 9.6V5.5c0-.6.4-1 1-1Z" />
+                </svg>
+              </button>
+
+              <span
+                class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
+                Kestrel quick env
+              </span>
+              <span class="text-[9px] text-gray-500 italic mt-0.5">
+                {{ selectedTool === 'kestrel' ? 'Tap to close' : 'Tap to read environment' }}
+              </span>
+            </div>
+
+            <!-- Mil / MOA converter icon -->
+            <div class="flex flex-col items-center">
+              <button
+                class="w-12 h-12 rounded-full bg-black flex items-center justify-center shadow-lg border border-gray-600"
+                (click)="onConverterToolClick()">
+                <!-- Crosshair / scope icon -->
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     viewBox="0 0 24 24"
+                     class="w-6 h-6">
+                  <circle cx="12" cy="12" r="7" class="fill-transparent stroke-white" stroke-width="1" />
+                  <line x1="12" y1="3" x2="12" y2="7" class="stroke-white" stroke-width="1" />
+                  <line x1="12" y1="17" x2="12" y2="21" class="stroke-white" stroke-width="1" />
+                  <line x1="3" y1="12" x2="7" y2="12" class="stroke-white" stroke-width="1" />
+                  <line x1="17" y1="12" x2="21" y2="12" class="stroke-white" stroke-width="1" />
+                  <circle cx="12" cy="12" r="1.4" class="fill-white" />
+                </svg>
+              </button>
+
+              <span
+                class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
+                Mil ↔ MOA converter
+              </span>
+              <span class="text-[9px] text-gray-500 italic mt-0.5">
+                {{ selectedTool === 'converter' ? 'Tap to close' : 'Tap to open converter' }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Kestrel details (only when selected) -->
+          <div *ngIf="selectedTool === 'kestrel'" class="mt-3 space-y-1 text-[11px]">
+            <p [ngClass]="kestrelError ? 'text-red-400' : 'text-gray-300'">
+              {{ kestrelStatus }}
+            </p>
+
+            <span class="text-[9px] text-gray-500" *ngIf="kestrelLastUpdate">
+              Last update: {{ kestrelLastUpdate | date:'shortTime' }}
+            </span>
+
+            <div *ngIf="kestrelData"
+                 class="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9px] text-gray-300 text-left">
+              <div>Temp:
+                <span class="font-semibold">
+                  {{ kestrelData.temperatureC | number:'1.1-1' }}°C
+                </span>
+              </div>
+              <div>Hum:
+                <span class="font-semibold">
+                  {{ kestrelData.humidityPercent | number:'1.0-1' }}%
+                </span>
+              </div>
+              <div>Press:
+                <span class="font-semibold">
+                  {{ kestrelData.pressureHpa | number:'1.1-1' }} hPa
+                </span>
+              </div>
+              <div>Wind:
+                <span class="font-semibold">
+                  {{ kestrelData.windSpeedMph | number:'1.1-1' }} mph
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Converter panel (only when selected) -->
+          <div *ngIf="selectedTool === 'converter'" class="mt-3 bg-black/40 rounded-2xl p-3 space-y-2 text-[11px]">
+            <div class="flex items-center justify-between mb-1">
+              <div class="font-semibold">Mil ↔ MOA converter</div>
+              <div class="text-[9px] text-gray-400">1 mil ≈ 3.438 MOA</div>
+            </div>
+
+            <!-- Mode toggle -->
+            <div class="flex bg-black/50 rounded-full p-0.5 text-[10px]">
+              <button
+                class="flex-1 px-2 py-1 rounded-full"
+                [ngClass]="converterMode === 'milToMoa'
+                  ? 'bg-orange-500 text-black font-semibold'
+                  : 'text-gray-300'"
+                (click)="converterMode = 'milToMoa'">
+                Mil → MOA
+              </button>
+              <button
+                class="flex-1 px-2 py-1 rounded-full"
+                [ngClass]="converterMode === 'moaToMil'
+                  ? 'bg-orange-500 text-black font-semibold'
+                  : 'text-gray-300'"
+                (click)="converterMode = 'moaToMil'">
+                MOA → Mil
+              </button>
+            </div>
+
+            <!-- Input / Output -->
+            <div class="flex items-center gap-2 mt-2">
+              <label class="flex-1 flex flex-col">
+                <span class="text-[10px] text-gray-300">
+                  Enter value
+                </span>
+                <input
+                  type="number"
+                  step="0.01"
+                  [(ngModel)]="converterInput"
+                  name="converterInput"
+                  class="mt-1 px-2 py-1 rounded bg-black border border-gray-700 text-[11px]" />
+              </label>
+
+              <div class="flex-1 flex flex-col">
+                <span class="text-[10px] text-gray-300">
+                  Result
+                </span>
+                <div class="mt-1 px-2 py-1 rounded bg-black border border-gray-800 text-[11px]">
+                  <ng-container *ngIf="converterOutput !== null; else noVal">
+                    {{ converterOutput }}
+                    <span class="text-[10px] text-gray-400 ml-1">
+                      {{ converterMode === 'milToMoa' ? 'MOA' : 'mil' }}
+                    </span>
+                  </ng-container>
+                  <ng-template #noVal>
+                    <span class="text-gray-600 text-[10px]">
+                      –
+                    </span>
+                  </ng-template>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- RIFLES TAB -->

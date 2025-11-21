@@ -1,19 +1,99 @@
 <div class="space-y-4 text-xs">
 
-  <!-- Step indicator -->
-  <div class="flex justify-center gap-2 text-[11px] text-gray-300">
-    <div [class.font-semibold]="step === 'setup'">1. Setup</div>
-    <div>•</div>
-    <div [class.font-semibold]="step === 'environment'">2. Environment</div>
-    <div>•</div>
-    <div [class.font-semibold]="step === 'shots'">3. Shot plan</div>
-    <div>•</div>
-    <div [class.font-semibold]="step === 'complete'">4. Complete</div>
+  <!-- ===================================================================== -->
+  <!-- PREMIUM WIZARD STEP HEADER + PROGRESS BAR (CLEANED UP FOR MOBILE)    -->
+  <!-- ===================================================================== -->
+  <div class="w-full flex flex-col items-center mt-1 mb-3 px-2">
+
+    <!-- Step bubbles row -->
+    <div class="w-full bg-gray-900/80 px-2 py-2 rounded-2xl shadow border border-gray-700 text-[11px] flex justify-between">
+
+      <!-- Step 1 -->
+      <div class="flex flex-col items-center flex-1">
+        <div
+          class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-200"
+          [ngClass]="step === 'setup'
+            ? 'bg-orange-500 text-black'
+            : 'bg-gray-700 text-gray-300'">
+          1
+        </div>
+        <span class="mt-1 text-[9px]"
+              [ngClass]="step === 'setup'
+                ? 'text-orange-400 font-semibold'
+                : 'text-gray-400'">
+          Setup
+        </span>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="flex flex-col items-center flex-1">
+        <div
+          class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-200"
+          [ngClass]="step === 'environment'
+            ? 'bg-orange-500 text-black'
+            : 'bg-gray-700 text-gray-300'">
+          2
+        </div>
+        <span class="mt-1 text-[9px] text-center"
+              [ngClass]="step === 'environment'
+                ? 'text-orange-400 font-semibold'
+                : 'text-gray-400'">
+          Environment
+        </span>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="flex flex-col items-center flex-1">
+        <div
+          class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-200"
+          [ngClass]="step === 'shots'
+            ? 'bg-orange-500 text-black'
+            : 'bg-gray-700 text-gray-300'">
+          3
+        </div>
+        <span class="mt-1 text-[9px] text-center"
+              [ngClass]="step === 'shots'
+                ? 'text-orange-400 font-semibold'
+                : 'text-gray-400'">
+          Shot plan
+        </span>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="flex flex-col items-center flex-1">
+        <div
+          class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-200"
+          [ngClass]="step === 'complete'
+            ? 'bg-orange-500 text-black'
+            : 'bg-gray-700 text-gray-300'">
+          4
+        </div>
+        <span class="mt-1 text-[9px]"
+              [ngClass]="step === 'complete'
+                ? 'text-orange-400 font-semibold'
+                : 'text-gray-400'">
+          Complete
+        </span>
+      </div>
+
+    </div>
+
+    <!-- PROGRESS BAR -->
+    <div class="mt-2 w-full max-w-xs h-[3px] bg-gray-800 rounded-full overflow-hidden">
+      <div
+        class="h-full bg-orange-500 transition-all duration-300"
+        [ngStyle]="{
+          width: step === 'setup' ? '25%' :
+                 step === 'environment' ? '50%' :
+                 step === 'shots' ? '75%' : '100%'
+        }">
+      </div>
+    </div>
   </div>
 
-  <!-- ========================================================= -->
-  <!-- STEP 1 — SETUP                                            -->
-  <!-- ========================================================= -->
+  <!-- ===================================================================== -->
+  <!-- STEP 1 — SETUP                                                        -->
+  <!-- ===================================================================== -->
   <div *ngIf="step === 'setup'" class="space-y-3">
     <div class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
 
@@ -40,10 +120,6 @@
               {{ r.name }} ({{ r.caliber }})
             </option>
           </select>
-          <span *ngIf="rifles.length === 0"
-                class="text-[10px] text-orange-400 mt-1">
-            No rifles saved yet. Add one on the Rifles tab.
-          </span>
         </label>
 
         <!-- Venue -->
@@ -58,10 +134,6 @@
               {{ v.name }}
             </option>
           </select>
-          <span *ngIf="venues.length === 0"
-                class="text-[10px] text-orange-400 mt-1">
-            No venues saved yet. Add one on the Venues tab.
-          </span>
         </label>
       </div>
 
@@ -88,9 +160,9 @@
     </div>
   </div>
 
-  <!-- ========================================================= -->
-  <!-- STEP 2 — ENVIRONMENT                                      -->
-  <!-- ========================================================= -->
+  <!-- ===================================================================== -->
+  <!-- STEP 2 — ENVIRONMENT                                                  -->
+  <!-- ===================================================================== -->
   <div *ngIf="step === 'environment'" class="space-y-3">
 
     <!-- Kestrel Card -->
@@ -100,7 +172,7 @@
       </h3>
 
       <p class="text-[11px] text-slate-300/80">
-        Connect to a Kestrel LiNK device or add MANUALLY below.
+        Connect to a Kestrel LiNK device or add manually below.
       </p>
 
       <button type="button"
@@ -178,7 +250,7 @@
                  class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
         </label>
       </div>
-      <!-- Wind hint / ballistic effect -->
+
       <div *ngIf="windHint"
            class="col-span-2 text-[10px] text-orange-400 mt-1">
         {{ windHint }}
@@ -204,9 +276,9 @@
     </div>
   </div>
 
-  <!-- ========================================================= -->
-  <!-- STEP 3 — SHOT PLAN                                        -->
-  <!-- ========================================================= -->
+  <!-- ===================================================================== -->
+  <!-- STEP 3 — SHOT PLAN                                                    -->
+  <!-- ===================================================================== -->
   <div *ngIf="step === 'shots'" class="space-y-3">
 
     <div class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
@@ -224,10 +296,8 @@
           (click)="toggleDistance(d)"
           class="px-3 py-2 text-xs rounded border transition"
           [ngClass]="{
-            'bg-orange-500 text-black border-orange-400 font-semibold shadow':
-              selectedDistances.includes(d),
-            'bg-black border-gray-700 text-gray-300':
-              !selectedDistances.includes(d)
+            'bg-orange-500 text-black border-orange-400 font-semibold shadow': selectedDistances.includes(d),
+            'bg-black border-gray-700 text-gray-300': !selectedDistances.includes(d)
           }"
         >
           {{ d }} m
@@ -264,9 +334,9 @@
     </div>
   </div>
 
-  <!-- ========================================================= -->
-  <!-- STEP 4 — COMPLETED                                         -->
-  <!-- ========================================================= -->
+  <!-- ===================================================================== -->
+  <!-- STEP 4 — COMPLETED                                                    -->
+  <!-- ===================================================================== -->
   <div *ngIf="step === 'complete'" class="space-y-3">
     <div class="bg-gray-900 rounded-xl p-4 shadow space-y-2">
 

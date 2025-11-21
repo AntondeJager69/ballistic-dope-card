@@ -91,9 +91,9 @@
     </div>
   </div>
 
-  <!-- ===================================================================== -->
-  <!-- STEP 1 — SETUP                                                        -->
-  <!-- ===================================================================== -->
+  <!-- ========================================================= -->
+  <!-- STEP 1 — SETUP                                            -->
+  <!-- ========================================================= -->
   <div *ngIf="step === 'setup'" class="space-y-3">
     <div class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
 
@@ -120,6 +120,10 @@
               {{ r.name }} ({{ r.caliber }})
             </option>
           </select>
+          <span *ngIf="rifles.length === 0"
+                class="text-[10px] text-orange-400 mt-1">
+            No rifles saved yet. Add one on the Rifles tab.
+          </span>
         </label>
 
         <!-- Venue -->
@@ -134,6 +138,10 @@
               {{ v.name }}
             </option>
           </select>
+          <span *ngIf="venues.length === 0"
+                class="text-[10px] text-orange-400 mt-1">
+            No venues saved yet. Add one on the Venues tab.
+          </span>
         </label>
       </div>
 
@@ -160,9 +168,9 @@
     </div>
   </div>
 
-  <!-- ===================================================================== -->
-  <!-- STEP 2 — ENVIRONMENT                                                  -->
-  <!-- ===================================================================== -->
+  <!-- ========================================================= -->
+  <!-- STEP 2 — ENVIRONMENT                                      -->
+  <!-- ========================================================= -->
   <div *ngIf="step === 'environment'" class="space-y-3">
 
     <!-- Kestrel Card -->
@@ -172,7 +180,7 @@
       </h3>
 
       <p class="text-[11px] text-slate-300/80">
-        Connect to a Kestrel LiNK device or add manually below.
+        Connect to a Kestrel LiNK device or add MANUALLY below.
       </p>
 
       <button type="button"
@@ -250,7 +258,7 @@
                  class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
         </label>
       </div>
-
+      <!-- Wind hint / ballistic effect -->
       <div *ngIf="windHint"
            class="col-span-2 text-[10px] text-orange-400 mt-1">
         {{ windHint }}
@@ -276,9 +284,9 @@
     </div>
   </div>
 
-  <!-- ===================================================================== -->
-  <!-- STEP 3 — SHOT PLAN                                                    -->
-  <!-- ===================================================================== -->
+  <!-- ========================================================= -->
+  <!-- STEP 3 — SHOT PLAN                                        -->
+  <!-- ========================================================= -->
   <div *ngIf="step === 'shots'" class="space-y-3">
 
     <div class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
@@ -296,8 +304,10 @@
           (click)="toggleDistance(d)"
           class="px-3 py-2 text-xs rounded border transition"
           [ngClass]="{
-            'bg-orange-500 text-black border-orange-400 font-semibold shadow': selectedDistances.includes(d),
-            'bg-black border-gray-700 text-gray-300': !selectedDistances.includes(d)
+            'bg-orange-500 text-black border-orange-400 font-semibold shadow':
+              selectedDistances.includes(d),
+            'bg-black border-gray-700 text-gray-300':
+              !selectedDistances.includes(d)
           }"
         >
           {{ d }} m
@@ -334,9 +344,9 @@
     </div>
   </div>
 
-  <!-- ===================================================================== -->
-  <!-- STEP 4 — COMPLETED                                                    -->
-  <!-- ===================================================================== -->
+  <!-- ========================================================= -->
+  <!-- STEP 4 — COMPLETED                                         -->
+  <!-- ========================================================= -->
   <div *ngIf="step === 'complete'" class="space-y-3">
     <div class="bg-gray-900 rounded-xl p-4 shadow space-y-2">
 

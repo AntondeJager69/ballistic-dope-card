@@ -1,258 +1,243 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { BleClient } from '@capacitor-community/bluetooth-le';
-
-// If you have typed models / DataService, you can swap the `any` types below
-// to your real ones. Using `any` here keeps it compatible even if your models differ.
 import { DataService } from '../data.service';
+import {
+  Rifle,
+  Venue,
+  SubRange,
+  Environment,
+  DistanceDope,
+  Session
+} from '../models';
+import { BleClient } from '@capacitor-community/bluetooth-le';
 
 type WizardStep = 'setup' | 'environment' | 'shots' | 'complete';
 
 interface KestrelSnapshot {
-  temperatureC: number | null;
-  humidityPercent: number | null;
-  pressureHpa: number | null;
-  densityAltitudeM: number | null;
-  windSpeedMph: number | null;
-  windClock: number | null; // 1–12
+  temperatureC: number;
+  humidityPercent: number;
+  pressureHpa: number;
+  densityAltitudeM: number;
+  windSpeedMph: number;
+  windClock: number; // 1–12
 }
 
 @Component({
   selector: 'app-session-tab',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  templateUrl: './session-tab.component.html'
+  templateUrl: './session-tab.component.html',
+  styleUrls: ['./session-tab.component.css']
 })
 export class SessionTabComponent implements OnInit {
-
-  // ------------------------------------------------------
-  // Wizard / navigation
-  // ------------------------------------------------------
   step: WizardStep = 'setup';
 
-  // ------------------------------------------------------
-  // Session setup
-  // ------------------------------------------------------
+  rifles: Rifle[] = [];
+  venues: Venue[] = [];
+
+  selectedRifleId: number | null = null;
+  selectedVenueId: number | null = null;
+  selectedSubRangeId: number | null = null;
+
   title = '';
+  environment: Environment = {};
 
-  rifles: any[] = [];
-  venues: any[] = [];
-  subRanges: any[] = [];
-
-  selectedRifleId: string | null = null;
-  selectedVenueId: string | null = null;
-  selectedSubRangeId: string | null = null;
-
-  // ------------------------------------------------------
-  // Environment
-  // ------------------------------------------------------
-  environment: any = {
-    temperatureC: null as number | null,
-    pressureHpa: null as number | null,
-    humidityPercent: null as number | null,
-    densityAltitudeM: null as number | null,
-    windSpeedMps: null as number | null,    // NOTE: your HTML uses "windSpeedMps"
-    lightConditions: '' as string
-  };
-
+  // Wind clock (1–12, relative to target at 12)
   windClock: number | null = null;
-  windHint: string | null = null;
 
-  // ------------------------------------------------------
-  // Shot plan
-  // ------------------------------------------------------
-  distanceOptions: number[] = [];
-  selectedDistances: number[] = [];
   shotCount: number | null = null;
+  selectedDistances: number[] = [];
   notes = '';
 
-  // ------------------------------------------------------
-  // Completion message
-  // ------------------------------------------------------
+  dopeRows: DistanceDope[] = [];
   completeMessage = '';
 
-  // ------------------------------------------------------
-  // Kestrel BLE state
-  // ------------------------------------------------------
-  kestrelIsConnecting = false;
+  // Kestrel integration state
   kestrelConnected = false;
-  kestrelStatus = 'Idle';
-  kestrelError: string | null = null;
+  kestrelStatus = 'Not connected';
   kestrelLastUpdate: Date | null = null;
   kestrelData: KestrelSnapshot | null = null;
+  kestrelError: string | null = null;
+  kestrelIsConnecting = false;
 
-  // These UUIDs are the ones we used before – adjust if needed
-  private kestrelServiceUuid = 'db743802-ec44-4eb2-a1de-b4ea00002903';
-  private sensorMeasurementsUuid = 'db743802-ec44-4eb2-a1de-b4ea10032903';
+  // NEW: track current device + auto-disconnect timer
+  private kestrelDeviceId: string | null = null;
+  private kestrelAutoDisconnectTimer: any | null = null;
 
-  constructor(private dataService: DataService) {}
+  constructor(private data: DataService) {}
 
-  // ------------------------------------------------------
-  // Lifecycle
-  // ------------------------------------------------------
   ngOnInit(): void {
-    this.loadReferenceData();
+    this.rifles = this.data.getRifles();
+    this.venues = this.data.getVenues();
   }
 
-  private loadReferenceData(): void {
-    try {
-      // Swap these to your actual DataService API names if different
-      if (this.dataService && typeof (this.dataService as any).getRifles === 'function') {
-        this.rifles = (this.dataService as any).getRifles();
-      }
-      if (this.dataService && typeof (this.dataService as any).getVenues === 'function') {
-        this.venues = (this.dataService as any).getVenues();
-      }
-    } catch (err) {
-      console.error('Error loading rifles/venues from DataService:', err);
+  // ---------- Derived getters ----------
+
+  get selectedVenue(): Venue | undefined {
+    return this.venues.find(v => v.id === this.selectedVenueId);
+  }
+
+  get subRanges(): SubRange[] {
+    const v = this.selectedVenue;
+    return v?.subRanges ?? [];
+  }
+
+  get selectedSubRange(): SubRange | undefined {
+    const list = this.subRanges;
+    return list.find(sr => sr.id === this.selectedSubRangeId);
+  }
+
+  get distanceOptions(): number[] {
+    const sr = this.selectedSubRange;
+    return sr?.distancesM ?? [];
+  }
+
+  get windHint(): string {
+    const speed = this.environment.windSpeedMps;
+    let clock = this.windClock;
+    if (!clock || !speed || speed <= 0) return '';
+
+    // Normalize clock to 1..12
+    clock = ((clock - 1) % 12) + 1;
+
+    const c = clock;
+    const isFront = c === 11 || c === 12 || c === 1;
+    const isBack = c === 5 || c === 6 || c === 7;
+    const isRight = c >= 1 && c <= 5;   // wind from right side
+    const isLeft = c >= 7 && c <= 11;   // wind from left side
+
+    let directionText = '';
+
+    if (isFront && isRight) directionText = 'slightly low with drift to the left';
+    else if (isFront && isLeft) directionText = 'slightly low with drift to the right';
+    else if (isFront) directionText = 'slightly low, minimal left/right drift';
+    else if (isBack && isRight) directionText = 'slightly high with drift to the left';
+    else if (isBack && isLeft) directionText = 'slightly high with drift to the right';
+    else if (isBack) directionText = 'slightly high, minimal left/right drift';
+    else if (isRight) directionText = 'drift to the left';
+    else if (isLeft) directionText = 'drift to the right';
+
+    let intensity = '';
+    if (speed < 2) intensity = 'Very light wind – small effect.';
+    else if (speed < 5) intensity = 'Light wind – moderate correction.';
+    else if (speed < 8) intensity = 'Medium wind – expect noticeable drift.';
+    else intensity = 'Strong wind – expect significant drift.';
+
+    return `Wind from ${c} o'clock at ${speed} mph: expect ${directionText}. ${intensity}`;
+  }
+
+  // ---------- Setup step ----------
+
+  onVenueChange() {
+    const srs = this.subRanges;
+    if (srs.length > 0) {
+      this.selectedSubRangeId = srs[0].id;
+    } else {
+      this.selectedSubRangeId = null;
     }
+    this.selectedDistances = [];
   }
 
-  // ------------------------------------------------------
-  // Setup step handlers
-  // ------------------------------------------------------
-  onVenueChange(): void {
-    const venue = this.venues.find(v => v.id === this.selectedVenueId);
-    this.subRanges = venue?.subRanges ?? [];
-    this.selectedSubRangeId = null;
-    this.updateDistanceOptions();
+  onSubRangeChange() {
+    this.selectedDistances = [];
   }
 
-  onSubRangeChange(): void {
-    this.updateDistanceOptions();
-  }
-
-  private updateDistanceOptions(): void {
-    const sr = this.subRanges.find(x => x.id === this.selectedSubRangeId);
-    this.distanceOptions = Array.isArray(sr?.distancesM) ? sr.distancesM : [];
-    // Keep only distances that still exist in the selected sub-range
-    this.selectedDistances = this.selectedDistances.filter(d => this.distanceOptions.includes(d));
-  }
-
-  nextFromSetup(): void {
-    if (!this.selectedRifleId || !this.selectedVenueId || !this.selectedSubRangeId) {
-      // You can add a toast/snackbar later
-      console.warn('Session setup incomplete: rifle/venue/sub-range missing');
+  nextFromSetup() {
+    if (!this.title.trim()) {
+      alert('Please enter a session title.');
+      return;
     }
-    this.step = 'environment';
-  }
-
-  backToSetup(): void {
-    this.step = 'setup';
-  }
-
-  // ------------------------------------------------------
-  // Environment step
-  // ------------------------------------------------------
-  nextFromEnvironment(): void {
-    this.updateWindHint();
-    this.step = 'shots';
-  }
-
-  backToEnvironment(): void {
-    this.step = 'environment';
-  }
-
-  private updateWindHint(): void {
-    const speed = this.environment.windSpeedMps as number | null;
-    const clock = this.windClock;
-
-    if (!speed || !clock) {
-      this.windHint = null;
+    if (!this.selectedRifleId) {
+      alert('Please select a rifle.');
+      return;
+    }
+    if (!this.selectedVenueId) {
+      alert('Please select a venue.');
+      return;
+    }
+    if (!this.selectedSubRangeId) {
+      alert('Please select a sub-range at the venue.');
       return;
     }
 
-    // Simple “clock system” crosswind factor
-    let factor = 0.25; // default 25%
-    if ([3, 4, 5, 7, 8, 9].includes(clock)) {
-      factor = 1.0;   // full value
-    } else if ([2, 10].includes(clock)) {
-      factor = 0.5;   // half value
-    }
-
-    const cross = speed * factor;
-    this.windHint = `Approx crosswind ${cross.toFixed(1)} mph (${Math.round(
-      factor * 100
-    )}% value) from ${clock} o'clock.`;
+    this.step = 'environment';
   }
 
-  // ------------------------------------------------------
-  // Shot plan step
-  // ------------------------------------------------------
-  toggleDistance(d: number): void {
-    if (this.selectedDistances.includes(d)) {
-      this.selectedDistances = this.selectedDistances.filter(x => x !== d);
-    } else {
-      this.selectedDistances = [...this.selectedDistances, d].sort((a, b) => a - b);
+  // ---------- Kestrel integration ----------
+
+   // Real Kestrel Bluetooth connection using Capacitor BLE (Android)
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // NEW: clear any existing auto-disconnect timer
+  private clearKestrelAutoDisconnect(): void {
+    if (this.kestrelAutoDisconnectTimer) {
+      clearTimeout(this.kestrelAutoDisconnectTimer);
+      this.kestrelAutoDisconnectTimer = null;
     }
   }
 
-  goShoot(): void {
-    // Build a simple session object. Adapt to your actual Session model if needed.
-    const session: any = {
-      id: Date.now().toString(),
-      title: this.title || 'New session',
-      rifleId: this.selectedRifleId,
-      venueId: this.selectedVenueId,
-      subRangeId: this.selectedSubRangeId,
-      environment: { ...this.environment, windClock: this.windClock },
-      distancesM: this.selectedDistances,
-      plannedShotCount: this.shotCount,
-      notes: this.notes,
-      createdAt: new Date().toISOString()
-    };
+  // NEW: schedule a hard disconnect + reset after 1 minute
+  private scheduleKestrelAutoDisconnect(): void {
+    this.clearKestrelAutoDisconnect();
 
-    try {
-      if (this.dataService && typeof (this.dataService as any).saveSession === 'function') {
-        (this.dataService as any).saveSession(session);
-      } else {
-        console.log('Session object (no saveSession method found):', session);
+    if (!this.kestrelConnected || !this.kestrelDeviceId) {
+      return;
+    }
+
+    this.kestrelAutoDisconnectTimer = setTimeout(() => {
+      console.log('Kestrel auto-disconnect: 60 seconds elapsed, disconnecting…');
+      void this.forceKestrelDisconnect();
+    }, 60_000); // 1 minute
+  }
+
+  // NEW: force disconnect + reset Kestrel state (keep environment values)
+  private async forceKestrelDisconnect(): Promise<void> {
+    this.clearKestrelAutoDisconnect();
+
+    if (this.kestrelDeviceId) {
+      try {
+        await BleClient.disconnect(this.kestrelDeviceId);
+      } catch (err) {
+        console.warn('Error during Kestrel auto-disconnect:', err);
       }
-      this.completeMessage = 'Session saved successfully.';
-    } catch (err) {
-      console.error('Error saving session:', err);
-      this.completeMessage = 'Error saving session – see console for details.';
     }
 
-    this.step = 'complete';
+    this.kestrelConnected = false;
+    this.kestrelIsConnecting = false;
+    this.kestrelDeviceId = null;
+    this.kestrelStatus = 'Not connected (auto-disconnected after 1 minute)';
+    // We intentionally do NOT clear environment.* so the imported values stay
+    // available for the session.
   }
 
-  newSession(): void {
-    // Reset main state but keep rifles/venues loaded
-    this.step = 'setup';
-    this.title = '';
-    this.selectedRifleId = null;
-    this.selectedVenueId = null;
-    this.selectedSubRangeId = null;
-    this.subRanges = [];
-    this.distanceOptions = [];
-    this.selectedDistances = [];
-    this.shotCount = null;
-    this.notes = '';
-    this.completeMessage = '';
-
-    this.environment = {
-      temperatureC: null,
-      pressureHpa: null,
-      humidityPercent: null,
-      densityAltitudeM: null,
-      windSpeedMps: null,
-      lightConditions: ''
-    };
-    this.windClock = null;
-    this.windHint = null;
-  }
-
-  // ------------------------------------------------------
-  // Kestrel Bluetooth integration
-  // ------------------------------------------------------
   async connectKestrelBluetooth(): Promise<void> {
+    // Clean up any previous timer/connection before starting a new one
+    this.clearKestrelAutoDisconnect();
+    if (this.kestrelConnected && this.kestrelDeviceId) {
+      try {
+        await BleClient.disconnect(this.kestrelDeviceId);
+      } catch (err) {
+        console.warn('Error disconnecting previous Kestrel connection:', err);
+      } finally {
+        this.kestrelConnected = false;
+        this.kestrelDeviceId = null;
+      }
+    }
+
     this.kestrelError = null;
     this.kestrelIsConnecting = true;
     this.kestrelStatus = 'Scanning for Kestrel…';
 
+    // Correct Kestrel Weather service + Sensor Measurements characteristic
+    // from your getServices() output + Weather Protocol:
+    const kestrelServiceUuid = '03290000-eab4-dea1-b24e-44ec023874db';
+    const sensorMeasurementsUuid = '03290310-eab4-dea1-b24e-44ec023874db';
+
     try {
+      // 1) Init BLE (Android 12+ friendly)
       await BleClient.initialize({ androidNeverForLocation: true });
 
       const enabled = await BleClient.isEnabled().catch(() => true);
@@ -261,60 +246,300 @@ export class SessionTabComponent implements OnInit {
         await BleClient.requestEnable();
       }
 
-      const device = await BleClient.requestDevice({
-        services: [this.kestrelServiceUuid]
-      });
+      // 2) Scan for devices and pick the first that looks like your ELITE Kestrel
+      let foundDevice: any = null;
 
-      this.kestrelStatus = `Connecting to ${device.name || 'Kestrel'}…`;
-      await BleClient.connect(device.deviceId);
-      this.kestrelConnected = true;
-      this.kestrelStatus = 'Connected. Subscribing to measurements…';
+      this.kestrelStatus = 'Scanning for Kestrel (up to 8s)…';
+      console.log('Starting BLE scan…');
 
-      await BleClient.startNotifications(
-        device.deviceId,
-        this.kestrelServiceUuid,
-        this.sensorMeasurementsUuid,
-        (value) => {
-          try {
-            const raw = new Uint8Array((value as any).buffer);
-            const dec = Array.from(raw);
-            const hex = dec.map(b => b.toString(16).padStart(2, '0')).join(' ');
+      await BleClient.requestLEScan(
+        {} as any,
+        (result) => {
+          const dev = result.device;
+          const name = (dev?.name || '').trim();
+          console.log('Scan result:', dev);
 
-            console.log('Kestrel RAW dec =', dec, 'hex =', hex);
+          if (!foundDevice && name) {
+            const lower = name.toLowerCase();
 
-            // TODO: Decode real fields once we agree on format.
-            // For now, we just stamp the last update and keep raw logged.
-            this.kestrelLastUpdate = new Date();
+            const looksLikeKestrel =
+              lower.startsWith('elite') ||       // "ELITE - 2998963"
+              lower.includes('elite') ||
+              lower.includes('2998') ||          // your serial fragment
+              lower.includes('kestrel') ||
+              lower.startsWith('k5') ||
+              lower.startsWith('k7') ||
+              lower.includes('5700');
 
-            // Example dummy decode (you can replace when we know the mapping):
-            const snapshot: KestrelSnapshot = {
-              temperatureC: null,
-              humidityPercent: null,
-              pressureHpa: null,
-              densityAltitudeM: null,
-              windSpeedMph: null,
-              windClock: this.windClock
-            };
-
-            this.kestrelData = snapshot;
-
-            // You can optionally map some decoded values into environment here:
-            // if (snapshot.temperatureC != null) this.environment.temperatureC = snapshot.temperatureC;
-
-          } catch (err) {
-            console.error('Error handling Kestrel notification:', err);
-          } finally {
-            this.kestrelIsConnecting = false;
-            this.kestrelStatus = 'Receiving measurements…';
+            if (looksLikeKestrel) {
+              foundDevice = dev;
+              this.kestrelStatus = `Found ${name}, preparing to connect…`;
+              console.log('Selected Kestrel candidate:', dev);
+            }
           }
         }
       );
+
+      // Wait up to 8 seconds for a match
+      const timeoutMs = 10000;
+      const start = Date.now();
+      while (!foundDevice && Date.now() - start < timeoutMs) {
+        await this.sleep(400);
+      }
+
+      await BleClient.stopLEScan().catch(err =>
+        console.warn('stopLEScan failed (not fatal):', err)
+      );
+      console.log('Stopped BLE scan');
+
+      if (!foundDevice) {
+        this.kestrelStatus = 'No Kestrel device found during scan.';
+        this.kestrelError =
+          'No Kestrel seen in BLE scan. Ensure LiNK/Bluetooth is enabled on the device.';
+        return;
+      }
+
+      const device = foundDevice;
+      this.kestrelDeviceId = device.deviceId || device.id || null;
+
+      this.kestrelStatus = `Connecting to ${device.name || device.deviceId}…`;
+      console.log('Connecting to device:', device);
+
+      // 3) Connect
+      await BleClient.connect(device.deviceId, (id) => {
+        console.log('Kestrel disconnected', id);
+        this.kestrelConnected = false;
+        // If the device drops the connection from its side, also clear timer + id
+        this.clearKestrelAutoDisconnect();
+        this.kestrelDeviceId = null;
+        this.kestrelStatus = 'Not connected';
+      });
+
+      // 4) Discover all services / characteristics and log them
+      let services: any[] = [];
+      try {
+        services = await BleClient.getServices(device.deviceId);
+        console.log(
+          'Kestrel services discovered (FULL LIST):',
+          JSON.stringify(services, null, 2)
+        );
+      } catch (e) {
+        console.warn('getServices failed (not fatal):', e);
+      }
+
+      // Find the Kestrel Weather service
+      const service = services.find(s =>
+        s.uuid?.toLowerCase() === kestrelServiceUuid.toLowerCase()
+      );
+
+      if (!service) {
+        this.kestrelStatus =
+          'Connected to device, but Kestrel Weather service UUID was not found.';
+        this.kestrelError =
+          'Check console for full service list; Weather service 03290000-… must be present.';
+        this.kestrelConnected = true; // connected, but no weather service
+        this.kestrelLastUpdate = new Date();
+        return;
+      }
+
+      // Find the Sensor Measurements characteristic in that service
+      const char = (service.characteristics || []).find((c: any) =>
+        c.uuid?.toLowerCase() === sensorMeasurementsUuid.toLowerCase()
+      );
+
+      if (!char) {
+        this.kestrelStatus =
+          'Connected, Weather service found, but Sensor Measurements characteristic (03290310-…) not found.';
+        this.kestrelError =
+          'Check console for characteristics under 03290000-… and adjust sensorMeasurementsUuid if needed.';
+        this.kestrelConnected = true;
+        this.kestrelLastUpdate = new Date();
+        return;
+      }
+
+      // 5) Read the Sensor Measurements characteristic (single read)
+      const value = await BleClient.read(
+        device.deviceId,
+        kestrelServiceUuid,
+        sensorMeasurementsUuid
+      );
+
+      const dv =
+        value instanceof DataView
+          ? value
+          : new DataView(
+              (value as any).buffer
+                ? (value as any).buffer
+                : new Uint8Array(value as any).buffer
+            );
+
+
+      // Byte layout (still our current best guess):
+      // wind, temp, humidity, pressure – each 2 bytes, LE, x10
+      const windRaw = dv.getUint16(0, true);     // m/s * 10
+      const tempRaw = dv.getInt16(2, true);      // °C * 10
+      const rhRaw = dv.getUint16(4, true);       // % * 10
+      const pressureRaw = dv.getUint16(6, true); // hPa * 10
+
+      const windMs = windRaw / 100;
+      const windMph = windMs * 2.23694;
+      const tempC = tempRaw / 100;
+      const humidity = rhRaw / 10;
+      const pressureHpa = pressureRaw / 10;
+
+      console.log('Kestrel SensorMeasurements raw:', {
+        windRaw,
+        tempRaw,
+        rhRaw,
+        pressureRaw
+      });
+
+      // Push into environment model (mph in UI)
+      this.environment.temperatureC = tempC;
+      this.environment.humidityPercent = humidity;
+      this.environment.pressureHpa = pressureHpa;
+      this.environment.windSpeedMps = parseFloat(windMph.toFixed(1));
+
+      this.kestrelData = {
+        temperatureC: tempC,
+        humidityPercent: humidity,
+        pressureHpa,
+        densityAltitudeM: this.environment.densityAltitudeM ?? 0,
+        windSpeedMph: parseFloat(windMph.toFixed(1)),
+        windClock: this.windClock ?? 12
+      };
+
+      this.kestrelConnected = true;
+      this.kestrelLastUpdate = new Date();
+      this.kestrelStatus = `Connected to ${device.name || 'Kestrel'} and imported data.`;
     } catch (err: any) {
       console.error('Kestrel Bluetooth error:', err);
+      this.kestrelStatus = 'Kestrel connection failed.';
       this.kestrelError = err?.message || String(err);
-      this.kestrelStatus = 'Error during Kestrel connection.';
+    } finally {
       this.kestrelIsConnecting = false;
-      this.kestrelConnected = false;
+      // After we have data and are marked as connected, keep the link
+      // alive for 1 minute, then auto-disconnect and reset Kestrel state.
+      this.scheduleKestrelAutoDisconnect();
     }
+  }
+
+  // ---------- Environment step ----------
+
+  nextFromEnvironment() {
+    // Convert windClock -> approximate windDirectionDeg (0° = from target / headwind)
+    if (this.windClock != null) {
+      let c = ((this.windClock - 1) % 12) + 1; // 1..12
+      const fraction = c === 12 ? 0 : c / 12;
+      const deg = Math.round(fraction * 360);
+      this.environment.windDirectionDeg = deg;
+    } else {
+      this.environment.windDirectionDeg = undefined;
+    }
+
+    this.step = 'shots';
+  }
+
+  // ---------- Shot planning step ----------
+
+  toggleDistance(d: number) {
+    if (this.selectedDistances.includes(d)) {
+      this.selectedDistances = this.selectedDistances.filter(x => x !== d);
+    } else {
+      this.selectedDistances = [...this.selectedDistances, d].sort((a, b) => a - b);
+    }
+  }
+
+  goShoot() {
+    if (this.selectedDistances.length === 0) {
+      alert('Select at least one distance to shoot.');
+      return;
+    }
+    if (!this.selectedRifleId || !this.selectedVenueId || !this.selectedSubRangeId) {
+      alert('Setup is incomplete. Please go back and select rifle, venue and sub-range.');
+      return;
+    }
+
+    // Build dope rows for each selected distance
+    this.dopeRows = this.selectedDistances.map(distance => ({
+      subRangeId: this.selectedSubRangeId!,
+      distanceM: distance
+    }));
+
+    const sessionNotesParts: string[] = [];
+    if (this.notes?.trim()) {
+      sessionNotesParts.push(this.notes.trim());
+    }
+    const sr = this.selectedSubRange;
+    const countText =
+      this.shotCount && this.shotCount > 0
+        ? `${this.shotCount} shots planned`
+        : 'Shot count not specified';
+
+    sessionNotesParts.push(
+      `${countText} at distances: ${this.selectedDistances.join(', ')} m` +
+        (sr ? ` on sub-range "${sr.name}"` : '')
+    );
+
+    const sessionToSave: Omit<Session, 'id'> = {
+      date: new Date().toISOString(),
+      rifleId: this.selectedRifleId,
+      venueId: this.selectedVenueId,
+      title: this.title || undefined,
+      environment: this.environment,
+      dope: this.dopeRows,
+      notes: sessionNotesParts.join(' | '),
+      completed: false
+    };
+
+    this.data.addSession(sessionToSave);
+
+    // increment rifle round count using planned shot count (if set)
+    if (this.shotCount && this.shotCount > 0) {
+      this.data.incrementRifleRoundCount(this.selectedRifleId, this.shotCount);
+    }
+
+    this.completeMessage =
+      'Session saved to History. Go shoot! After you are done, open the History tab to enter your actual dope.';
+    this.step = 'complete';
+  }
+
+  // ---------- Navigation ----------
+
+  backToSetup() {
+    this.step = 'setup';
+  }
+
+  backToEnvironment() {
+    this.step = 'environment';
+  }
+
+  newSession() {
+    this.step = 'setup';
+    this.title = '';
+    this.selectedRifleId = null;
+    this.selectedVenueId = null;
+    this.selectedSubRangeId = null;
+    this.environment = {};
+    this.windClock = null;
+    this.shotCount = null;
+    this.selectedDistances = [];
+    this.notes = '';
+    this.dopeRows = [];
+    this.completeMessage = '';
+
+    this.kestrelConnected = false;
+    this.kestrelStatus = 'Not connected';
+    this.kestrelLastUpdate = null;
+    this.kestrelData = null;
+    this.kestrelError = null;
+    this.kestrelIsConnecting = false;
+
+    // Also clear any pending auto-disconnect when starting a fresh session
+    this.clearKestrelAutoDisconnect();
+    this.kestrelDeviceId = null;
+
+    this.rifles = this.data.getRifles();
+    this.venues = this.data.getVenues();
   }
 }

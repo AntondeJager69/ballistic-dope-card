@@ -2,21 +2,22 @@
   <!-- Phone frame -->
   <div class="w-full max-w-sm flex flex-col">
 
-       <!-- Title (hidden when Wind effect is full-screen) -->
-    <div
-      class="text-center mb-3"
-      *ngIf="!(currentTab === 'menu' && selectedTool === 'windEffect')">
-      <h1 class="text-base font-semibold">
-        {{ appTitle }}
-      </h1>
-      <p class="text-[11px] text-gray-300">
-        {{ appSubtitle }}
-      </p>
-      <p class="text-[10px] text-gray-500 mt-0.5">
-        Version {{ appVersion }}
-      </p>
-      <div class="mt-2 h-[1px] bg-gray-700 mx-auto w-40"></div>
-    </div>
+       
+    <<!-- Title: ONLY on main menu, hidden on other tabs and Wind effect full screen -->
+<div
+  class="text-center mb-3"
+  *ngIf="currentTab === 'menu' && selectedTool !== 'windEffect'">
+  <h1 class="text-base font-semibold">
+    {{ appTitle }}
+  </h1>
+  <p class="text-[11px] text-gray-300">
+    {{ appSubtitle }}
+  </p>
+  <p class="text-[10px] text-gray-500 mt-0.5">
+    Version {{ appVersion }}
+  </p>
+  <div class="mt-2 h-[1px] bg-gray-700 mx-auto w-40"></div>
+</div>
 
 
     <!-- Main content card -->
@@ -57,9 +58,7 @@
       <!-- 🔽 put your existing Main menu, Reports, Tools & utilities stuff here 🔽 -->
       <!-- Main menu heading -->
       <div class="px-1 pt-1 pb-1">
-        <h2 class="text-sm font-semibold text-gray-100 tracking-wide">
-          Main menu
-        </h2>
+
       </div>
           <!-- Main menu buttons ULTRA COMPACT -->
           <div class="space-y-2 mt-1">

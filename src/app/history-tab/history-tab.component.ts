@@ -17,6 +17,8 @@ export class HistoryTabComponent implements OnInit {
   saveMessage: string | null = null;
   private saveMessageTimeout: any = null;
 
+  searchTerm: string = '';
+  expandedVenueId: number | null = null;
   constructor(private dataService: DataService) {}
 
   ngOnInit(): void {
@@ -41,7 +43,7 @@ export class HistoryTabComponent implements OnInit {
   }
 
   // --------------------------------------------------
-  // State helpers
+  // Status helpers
   // --------------------------------------------------
   getStatusLabel(s: any): string {
     if (s.completed) return 'Completed';
@@ -60,9 +62,151 @@ export class HistoryTabComponent implements OnInit {
     return base + 'bg-slate-600 text-slate-100';
   }
 
+  // --------------------------------------------------
+  // Rifle / venue lookup helpers
+  // --------------------------------------------------
+  getRifleName(rifleId: string | null | undefined): string {
+    try {
+      const ds: any = this.dataService;
+      if (!rifleId || !ds || typeof ds.getRifles !== 'function') {
+        return 'Unknown rifle';
+      }
+      const rifle = ds.getRifles().find((r: any) => r.id === rifleId);
+      return rifle ? rifle.name : 'Unknown rifle';
+    } catch {
+      return 'Unknown rifle';
+    }
+  }
+
+  getVenueName(venueId: string | null | undefined): string {
+    try {
+      const ds: any = this.dataService;
+      if (!venueId || !ds || typeof ds.getVenues !== 'function') {
+        return 'Unknown venue';
+      }
+      const venue = ds.getVenues().find((v: any) => v.id === venueId);
+      return venue ? venue.name : 'Unknown venue';
+    } catch {
+      return 'Unknown venue';
+    }
+  }
+  
+  // --------------------------------------------------
+  // Search & grouping for venue-based history view
+  // --------------------------------------------------
+  get filteredSessions(): any[] {
+    const term = this.searchTerm?.trim().toLowerCase();
+    if (!term) {
+      return this.sessions || [];
+    }
+    return (this.sessions || []).filter((s: any) => {
+      const venueName = (this.getVenueName(s.venueId) || '').toLowerCase();
+      const rifleName = (this.getRifleName(s.rifleId) || '').toLowerCase();
+      const title = (s.title || '').toLowerCase();
+      const notes = (s.notes || '').toLowerCase();
+      return (
+        venueName.includes(term) ||
+        rifleName.includes(term) ||
+        title.includes(term) ||
+        notes.includes(term)
+      );
+    });
+  }
+  
+  get venueGroups(): { venueId: number | null; venueName: string; sessions: any[] }[] {
+    const map = new Map<number | null, { venueId: number | null; venueName: string; sessions: any[] }>();
+    for (const s of this.filteredSessions) {
+      const vid = (s.venueId ?? null) as number | null;
+      const vname = this.getVenueName(s.venueId) || 'Unknown venue';
+      let group = map.get(vid);
+      if (!group) {
+        group = { venueId: vid, venueName: vname, sessions: [] };
+        map.set(vid, group);
+      }
+      group.sessions.push(s);
+    }
+    const groups = Array.from(map.values());
+    // sort sessions in each group by date (oldest first)
+    for (const g of groups) {
+      g.sessions.sort((a, b) => this.getSessionTime(a) - this.getSessionTime(b));
+    }
+    // sort venues alphabetically
+    groups.sort((a, b) => a.venueName.localeCompare(b.venueName));
+    return groups;
+  }
+  
+  private getSessionTime(s: any): number {
+    if (!s || !s.date) return 0;
+    return new Date(s.date).getTime();
+  }
+  
+  clearSearch(): void {
+    this.searchTerm = '';
+  }
+  
+  toggleVenue(venueId: number | null): void {
+    this.expandedVenueId = this.expandedVenueId === venueId ? null : venueId;
+  }
+  
+  summarizeDateRange(sessions: any[]): string {
+    if (!sessions || sessions.length === 0) return '';
+    const sorted = [...sessions].sort((a, b) => this.getSessionTime(a) - this.getSessionTime(b));
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    const firstDate = new Date(first.date);
+    const lastDate = new Date(last.date);
+    const firstStr = firstDate.toLocaleDateString();
+    const lastStr = lastDate.toLocaleDateString();
+    if (firstStr === lastStr) {
+      return firstStr;
+    }
+    return `${firstStr} → ${lastStr}`;
+  }
+
+  // --------------------------------------------------
+  // Selecting / deleting sessions
+  // --------------------------------------------------
+  selectSession(s: any): void {
+    this.selectedSessionId = s.id;
+    this.validationError = null;
+    this.clearSaveMessage();
+
+    // Deep clone so we can edit safely
+    this.editSession = JSON.parse(JSON.stringify(s));
+  }
+
+  deleteSession(s: any): void {
+    if (!s || !s.id) return;
+
+    const confirmed = confirm('Delete this session from history? This cannot be undone.');
+    if (!confirmed) return;
+
+    const idx = this.sessions.findIndex(sess => sess.id === s.id);
+    if (idx >= 0) {
+      this.sessions.splice(idx, 1);
+      try {
+        const ds: any = this.dataService;
+        if (ds && typeof ds.saveSessions === 'function') {
+          ds.saveSessions(this.sessions);
+        }
+      } catch (err) {
+        console.error('Error saving sessions after delete:', err);
+      }
+    }
+
+    if (this.selectedSessionId === s.id) {
+      this.selectedSessionId = null;
+      this.editSession = null;
+    }
+  }
+
+  // --------------------------------------------------
+  // Editable rules for DOPE
+  // --------------------------------------------------
+
   /**
-   * Editable only if:
-   * - has DOPE rows, and
+   * Session is editable (In progress) if:
+   * - has DOPE array,
    * - not completed yet
    */
   isSessionEditable(session: any | null): boolean {
@@ -99,101 +243,47 @@ export class HistoryTabComponent implements OnInit {
     return true;
   }
 
-  getRifleName(rifleId: string | null | undefined): string {
-    try {
-      const ds: any = this.dataService;
-      if (!rifleId || !ds || typeof ds.getRifles !== 'function') {
-        return 'Unknown rifle';
-      }
-      const rifle = ds.getRifles().find((r: any) => r.id === rifleId);
-      return rifle ? rifle.name : 'Unknown rifle';
-    } catch {
-      return 'Unknown rifle';
-    }
-  }
-
-  getVenueName(venueId: string | null | undefined): string {
-    try {
-      const ds: any = this.dataService;
-      if (!venueId || !ds || typeof ds.getVenues !== 'function') {
-        return 'Unknown venue';
-      }
-      const venue = ds.getVenues().find((v: any) => v.id === venueId);
-      return venue ? venue.name : 'Unknown venue';
-    } catch {
-      return 'Unknown venue';
-    }
-  }
-
   // --------------------------------------------------
-  // Selecting / deleting sessions
+  // Wind auto-fill & helpers
   // --------------------------------------------------
-  selectSession(s: any): void {
-    this.selectedSessionId = s.id;
-    this.validationError = null;
-    this.clearSaveMessage();
 
-    // Deep clone so we can edit safely
-    this.editSession = JSON.parse(JSON.stringify(s));
-
-    if (!this.editSession.dope) {
-      this.editSession.dope = [];
-    }
-
-    this.applyWindDefaultsToDope();
-  }
-
-  deleteSession(s: any): void {
-    if (!confirm('Delete this session from history?')) return;
-
-    this.sessions = this.sessions.filter(sess => sess.id !== s.id);
-    if (this.selectedSessionId === s.id) {
-      this.selectedSessionId = null;
-      this.editSession = null;
-    }
-
-    // Persist deletion if DataService supports it
-    try {
-      const ds: any = this.dataService;
-      if (ds && typeof ds.saveSessions === 'function') {
-        ds.saveSessions(this.sessions);
-      } else if (ds && typeof ds.deleteSession === 'function') {
-        ds.deleteSession(s.id);
-      }
-    } catch (err) {
-      console.error('Error deleting session via DataService:', err);
-    }
-  }
-
-  // --------------------------------------------------
-  // Wind defaults + arrows (display + assists)
-  // --------------------------------------------------
   /**
-   * Fill windSpeed / windDirection from recorded environment
-   * for rows that don't have values yet.
-   * windDirection is stored as CLOCK (1–12) when auto-filled.
+   * If environment is present on the session, copy
+   * windSpeed + windDirection into any DOPE rows where they are missing.
    */
-  private applyWindDefaultsToDope(): void {
-    if (!this.editSession || !Array.isArray(this.editSession.dope)) return;
+  autoFillWindFromEnvironment(): void {
+    if (!this.editSession || !this.editSession.environment || !Array.isArray(this.editSession.dope)) {
+      return;
+    }
 
-    const env = this.editSession.environment || {};
-    const envWindSpeed = env.windSpeedMps ?? env.windSpeed ?? null;
-    const envWindDirRaw = env.windDirectionDeg ?? env.windDirection ?? null;
+    const env = this.editSession.environment;
+
+    const envWindSpeed =
+      env.windSpeedMps ??
+      env.windSpeedKph ??
+      env.windSpeedMph ??
+      null;
 
     let envClock: number | null = null;
-    if (envWindDirRaw != null) {
-      if (typeof envWindDirRaw === 'number') {
-        envClock = this.degreesToClock(envWindDirRaw);
-      } else {
-        const str = String(envWindDirRaw);
-        const parsed = parseFloat(str);
-        if (!isNaN(parsed)) {
-          if (parsed > 12 || str.includes('°')) {
-            // treat as degrees
-            envClock = this.degreesToClock(parsed);
-          } else {
-            // already a clock value
-            envClock = parsed;
+
+    if (env.windDirectionDeg != null) {
+      envClock = this.degreesToClock(env.windDirectionDeg);
+    } else {
+      let envWindDirRaw: any = env.windDirection ?? null;
+      if (envWindDirRaw != null) {
+        if (typeof envWindDirRaw === 'number') {
+          envClock = this.degreesToClock(envWindDirRaw);
+        } else {
+          const str = String(envWindDirRaw);
+          const parsed = parseFloat(str);
+          if (!isNaN(parsed)) {
+            if (parsed > 12 || str.includes('°')) {
+              // treat as degrees
+              envClock = this.degreesToClock(parsed);
+            } else {
+              // already a clock value
+              envClock = parsed;
+            }
           }
         }
       }
@@ -216,13 +306,34 @@ export class HistoryTabComponent implements OnInit {
     return field === 'windSpeed' ? !!row._windSpeedAuto : !!row._windDirectionAuto;
   }
 
-  /**
-   * Compute a wind arrow symbol based on wind direction.
-   * Accepts:
-   * - clock values 1–12 (or "3 o'clock")
-   * - degrees (0–360)
-   * If only env has it, uses env as fallback.
-   */
+  // Maps degrees (0° at 12 o'clock, clockwise positive) to a little arrow string.
+  private degreesToArrow(deg: number): string {
+    const normalized = ((deg % 360) + 360) % 360;
+
+    if (normalized >= 337.5 || normalized < 22.5) return '↑';
+    if (normalized >= 22.5 && normalized < 67.5) return '↗';
+    if (normalized >= 67.5 && normalized < 112.5) return '→';
+    if (normalized >= 112.5 && normalized < 157.5) return '↘';
+    if (normalized >= 157.5 && normalized < 202.5) return '↓';
+    if (normalized >= 202.5 && normalized < 247.5) return '↙';
+    if (normalized >= 247.5 && normalized < 292.5) return '←';
+    return '↖';
+  }
+
+  // 12 o'clock (headwind) = 0°, 3 o'clock (from right) = 90°, etc.
+  private clockToDegrees(clock: number): number {
+    let c = clock;
+    if (c < 1) c = 1;
+    if (c > 12) c = 12;
+    return (c % 12) * 30;
+  }
+
+  private degreesToClock(deg: number): number {
+    let d = ((deg % 360) + 360) % 360;
+    const hour = Math.round(d / 30) % 12 || 12;
+    return hour;
+  }
+
   getWindArrow(row: any): string {
     if (!row) return '•';
 
@@ -256,58 +367,38 @@ export class HistoryTabComponent implements OnInit {
         const degFromClock = this.clockToDegrees(num);
         return this.degreesToArrow(degFromClock);
       }
-      // Otherwise treat as degrees
+
+      // Treat anything else as degrees
       return this.degreesToArrow(num);
     }
 
+    // Fallback: no idea, show dot
     return '•';
   }
 
+  // --------------------------------------------------
+  // Save logic (in-progress vs completed)
+  // --------------------------------------------------
+
   /**
-   * 8-way arrow: ↑, ↗, →, ↘, ↓, ↙, ←, ↖
+   * Primary button: if all rows complete, mark completed, otherwise just save.
    */
-  private degreesToArrow(deg: number): string {
-    let d = deg % 360;
-    if (d < 0) d += 360;
-
-    if (d >= 337.5 || d < 22.5) return '↑';
-    if (d >= 22.5 && d < 67.5) return '↗';
-    if (d >= 67.5 && d < 112.5) return '→';
-    if (d >= 112.5 && d < 157.5) return '↘';
-    if (d >= 157.5 && d < 202.5) return '↓';
-    if (d >= 202.5 && d < 247.5) return '↙';
-    if (d >= 247.5 && d < 292.5) return '←';
-    return '↖';
-  }
-
-  /** Convert clock (1–12, target at 12) to degrees “from” direction */
-  private clockToDegrees(clock: number): number {
-    const c = ((clock % 12) + 12) % 12; // normalize
-    // 12 -> 0°, 3 -> 90°, 6 -> 180°, 9 -> 270°
-    return c === 0 ? 0 : (c / 12) * 360;
-  }
-
-  /** Convert degrees (0–360) to nearest clock number 1–12 (target at 12) */
-  private degreesToClock(deg: number): number {
-    let d = deg % 360;
-    if (d < 0) d += 360;
-    // 30° per “hour”; round to nearest
-    let hour = Math.round(d / 30) % 12;
-    if (hour === 0) hour = 12;
-    return hour;
-  }
-
-  // --------------------------------------------------
-  // Save behaviour: in-progress vs complete
-  // --------------------------------------------------
   onPrimarySaveClick(): void {
     if (!this.editSession) return;
 
-    if (this.isSessionFullyCompleted(this.editSession)) {
-      this.saveAndComplete();
-    } else {
-      this.saveInProgress();
+    if (!this.isSessionEditable(this.editSession)) {
+      // In read-only states, primary button is simply Close, so bail here.
+      return;
     }
+
+    if (!this.isSessionFullyCompleted(this.editSession)) {
+      // Partial, still in-progress.
+      this.saveInProgress();
+      return;
+    }
+
+    // Fully completed DOPE -> mark session completed
+    this.saveAndComplete();
   }
 
   /** Save partial DOPE, keep session In progress, show toast. */
@@ -318,72 +409,43 @@ export class HistoryTabComponent implements OnInit {
 
     const idx = this.sessions.findIndex(s => s.id === this.editSession!.id);
     if (idx >= 0) {
-      this.sessions[idx] = { ...this.editSession };
+      this.sessions[idx] = { ...this.editSession, completed: false };
+      this.persistSessions();
+      this.showSaveMessage('Session saved (In progress).');
     }
-
-    // Persist updated sessions if DataService supports it
-    try {
-      const ds: any = this.dataService;
-      if (ds && typeof ds.saveSessions === 'function') {
-        ds.saveSessions(this.sessions);
-      } else if (ds && typeof ds.updateSession === 'function') {
-        ds.updateSession(this.editSession);
-      }
-    } catch (err) {
-      console.error('Error saving in-progress session from HistoryTab:', err);
-    }
-
-    this.showSaveMessage('Saved. Session remains In Progress.');
   }
 
-  /** Save ONLY if all rows complete, then mark completed and close. */
+  /** Save DOPE and mark as Completed, show toast. */
   private saveAndComplete(): void {
     if (!this.editSession) return;
 
-    if (!this.isSessionEditable(this.editSession)) {
-      this.validationError =
-        'This session is not editable here. Only "In progress" sessions with DOPE can be edited.';
-      return;
-    }
-
-    // Double-check completeness before finalising
+    // Final validation
     if (!this.isSessionFullyCompleted(this.editSession)) {
-      this.validationError =
-        'Please complete Elevation, Windage, Wind speed and Wind direction for every distance before marking this session as completed.';
+      this.validationError = 'Please fill all DOPE fields (elevation, wind, speed, direction).';
       return;
     }
 
     this.validationError = null;
 
-    // Mark completed
-    this.editSession.completed = true;
-
-    // Write edited session back into sessions list
     const idx = this.sessions.findIndex(s => s.id === this.editSession!.id);
     if (idx >= 0) {
-      this.sessions[idx] = { ...this.editSession };
+      this.sessions[idx] = { ...this.editSession, completed: true };
+      this.persistSessions();
+      this.showSaveMessage('Session saved & marked as completed.');
     }
+  }
 
-    // Persist updated sessions if DataService supports it
+  private persistSessions(): void {
     try {
       const ds: any = this.dataService;
       if (ds && typeof ds.saveSessions === 'function') {
         ds.saveSessions(this.sessions);
-      } else if (ds && typeof ds.updateSession === 'function') {
-        ds.updateSession(this.editSession);
       }
     } catch (err) {
-      console.error('Error saving completed session from HistoryTab:', err);
+      console.error('Error persisting sessions from HistoryTab:', err);
     }
-
-    // Close detail view
-    this.editSession = null;
-    this.clearSaveMessage();
   }
 
-  // --------------------------------------------------
-  // Toast helper
-  // --------------------------------------------------
   private showSaveMessage(msg: string): void {
     this.saveMessage = msg;
     if (this.saveMessageTimeout) {

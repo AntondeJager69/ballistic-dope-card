@@ -18,14 +18,14 @@ export class WindEffectToolComponent implements OnInit {
   @ViewChild('circle', { static: true }) circleRef!: ElementRef<HTMLDivElement>;
 
   // Wind inputs
-  windSpeed = 5;   // arbitrary units (m/s or mph – just visual)
-  windClock = 3;   // 3 o'clock = from the right
-  windAngleDeg = 90; // 0° = from 12 o'clock, clockwise
+  windSpeed = 5;        // m/s or mph – just for scale
+  windClock = 3;        // 3 o'clock = from the right
+  windAngleDeg = 90;    // 0° = from 12 o'clock, clockwise
 
   // Drawing
   circleDiameter = 220; // px
-  impactX = 0; // px offset from centre
-  impactY = 0; // px offset from centre
+  impactX = 0;          // px offset from centre
+  impactY = 0;          // px offset from centre
 
   // Drag state
   private isDragging = false;
@@ -34,6 +34,12 @@ export class WindEffectToolComponent implements OnInit {
     this.syncAngleFromClock();
     this.computeImpact();
   }
+
+   // Radius for fat arrow – slightly OUTSIDE the circle rim
+  get arrowRadius(): number {
+    return this.circleDiameter / 2 + 10; // 10px outside the border
+  }
+
 
   // Crosswind % of a pure 90° crosswind
   get crosswindPercent(): number {
@@ -57,7 +63,7 @@ export class WindEffectToolComponent implements OnInit {
   // Map clock → angle (12 = 0°, 3 = 90°, 6 = 180°, 9 = 270°)
   private syncAngleFromClock(): void {
     let c = this.windClock ?? 12;
-    c = ((c - 1) % 12 + 12) % 12 + 1; // clamp to 1..12
+    c = ((c - 1) % 12 + 12) % 12 + 1; // clamp 1..12
     this.windClock = c;
 
     let deg = c * 30;
@@ -73,21 +79,29 @@ export class WindEffectToolComponent implements OnInit {
   // ---------------- Pointer / drag handling ----------------
 
   onCirclePointerDown(event: PointerEvent): void {
-    event.preventDefault();
+    event.preventDefault(); // stop scroll
     this.isDragging = true;
+    (event.target as HTMLElement).setPointerCapture(event.pointerId);
     this.updateAngleFromPointer(event);
   }
 
   @HostListener('window:pointermove', ['$event'])
   onWindowPointerMove(event: PointerEvent): void {
     if (!this.isDragging) return;
+    event.preventDefault(); // lock screen movement while dragging
     this.updateAngleFromPointer(event);
   }
 
-  @HostListener('window:pointerup')
-  @HostListener('window:pointercancel')
-  endDrag(): void {
+  @HostListener('window:pointerup', ['$event'])
+  @HostListener('window:pointercancel', ['$event'])
+  endDrag(event: PointerEvent): void {
+    if (!this.isDragging) return;
     this.isDragging = false;
+    try {
+      (event.target as HTMLElement).releasePointerCapture(event.pointerId);
+    } catch {
+      // ignore
+    }
   }
 
   private updateAngleFromPointer(event: PointerEvent): void {
@@ -107,9 +121,9 @@ export class WindEffectToolComponent implements OnInit {
     this.computeImpact();
   }
 
-  // ---------------- Physics-ish visualisation ----------------
+  // ---------------- Visualised POI shift ----------------
 
-  private computeImpact(): void {
+    private computeImpact(): void {
     // Normalise speed into 0..1 (cap at 20 units)
     const speedNorm = Math.max(0, Math.min(this.windSpeed, 20)) / 20;
     const angleRad = (this.windAngleDeg * Math.PI) / 180;
@@ -118,16 +132,24 @@ export class WindEffectToolComponent implements OnInit {
     const cross = Math.sin(angleRad);
 
     // Vertical (up/down) component ~ cos
-    // (smaller influence, just to show high/low on head/tail winds)
+    // Smaller influence, to show high/low for head/tail winds
     const vertical = Math.cos(angleRad);
 
     const maxRadius = this.circleDiameter / 2 - 20;
     const driftRadius = maxRadius * speedNorm;
 
-    // X right positive, Y down positive (we invert Y so "up" on screen is positive lift)
-    this.impactX = cross * driftRadius;
-    this.impactY = -vertical * driftRadius * 0.4; // 40% of lateral effect
+    // 🔁 IMPORTANT:
+    // Red dot should move OPPOSITE the wind arrow.
+    // - Wind from 3 o'clock (right) => impact left  (negative X)
+    // - Wind from 9 o'clock (left)  => impact right (positive X)
+    this.impactX = -cross * driftRadius;
+
+    // Simple ballistic-ish feel:
+    // - Headwind (12 o'clock)  => slightly LOWER impact  (dot down)
+    // - Tailwind (6 o'clock)   => slightly HIGHER impact (dot up)
+    this.impactY = vertical * driftRadius * 0.3; // 30% of lateral effect
   }
+
 
   private degreesToClock(deg: number): number {
     // 0° = 12, 90° = 3, 180° = 6, 270° = 9

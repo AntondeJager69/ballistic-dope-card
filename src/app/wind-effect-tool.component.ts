@@ -17,141 +17,116 @@ import { FormsModule } from '@angular/forms';
 export class WindEffectToolComponent implements OnInit {
   @ViewChild('circle', { static: true }) circleRef!: ElementRef<HTMLDivElement>;
 
-  // User input
-  windSpeed: number = 5;          // m/s or whatever you use visually
-  windAngleDeg: number = 90;      // 0° = from 12 o'clock, 90° = from 3 o'clock, etc.
+  // Wind inputs
+  windSpeed = 5;   // arbitrary units (m/s or mph – just visual)
+  windClock = 3;   // 3 o'clock = from the right
+  windAngleDeg = 90; // 0° = from 12 o'clock, clockwise
 
-  // Visual sizing
-  circleRadiusPx = 110;           // radius used for arrow position
-  maxImpactOffsetPx = 65;         // max red-dot offset from center
-
-  // Computed red-dot position (CSS pixels)
-  impactX = 0;
-  impactY = 0;
+  // Drawing
+  circleDiameter = 220; // px
+  impactX = 0; // px offset from centre
+  impactY = 0; // px offset from centre
 
   // Drag state
   private isDragging = false;
 
   ngOnInit(): void {
+    this.syncAngleFromClock();
     this.computeImpact();
   }
 
-  // ---------------------------------------------------------------------------
-  // Pointer / drag handling
-  // ---------------------------------------------------------------------------
-
-  onCircleClick(event: MouseEvent | TouchEvent): void {
-    this.updateAngleFromEvent(event);
-  }
-
-  onHandleDown(event: MouseEvent | TouchEvent): void {
-    event.preventDefault();
-    this.isDragging = true;
-    this.updateAngleFromEvent(event);
-  }
-
-  @HostListener('window:mousemove', ['$event'])
-  onWindowMouseMove(event: MouseEvent): void {
-    if (!this.isDragging) return;
-    this.updateAngleFromEvent(event);
-  }
-
-  @HostListener('window:touchmove', ['$event'])
-  onWindowTouchMove(event: TouchEvent): void {
-    if (!this.isDragging) return;
-    this.updateAngleFromEvent(event);
-  }
-
-  @HostListener('window:mouseup')
-  @HostListener('window:touchend')
-  onWindowUp(): void {
-    this.isDragging = false;
-  }
-
-  private updateAngleFromEvent(event: MouseEvent | TouchEvent): void {
-    const circleEl = this.circleRef?.nativeElement;
-    if (!circleEl) return;
-
-    let clientX: number;
-    let clientY: number;
-
-    if (event instanceof MouseEvent) {
-      clientX = event.clientX;
-      clientY = event.clientY;
-    } else {
-      if (!event.touches.length) return;
-      clientX = event.touches[0].clientX;
-      clientY = event.touches[0].clientY;
-    }
-
-    const rect = circleEl.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-
-    const dx = clientX - cx;
-    const dy = clientY - cy;
-
-    // atan2 is measured from +X axis (to the right), counter-clockwise
-    let mathDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
-
-    // Convert so that:
-    //   0°  = FROM 12 o'clock (top, head-on),
-    //   90° = FROM 3 o'clock (from the right),
-    //   180°= FROM 6 o'clock (from behind), etc.
-    const clockDeg = (mathDeg + 90 + 360) % 360;
-
-    this.windAngleDeg = clockDeg;
-    this.computeImpact();
-  }
-
-  // ---------------------------------------------------------------------------
-  // Wind / impact model (visual only, not full ballistics)
-  // ---------------------------------------------------------------------------
-
-  computeImpact(): void {
-    // Full value when wind is purely side-on (3 or 9 o'clock),
-    // zero when head-on or tail-wind (12 or 6 o'clock).
-    const angleRad = (this.windAngleDeg * Math.PI) / 180;
-    const fullValueFactor = Math.sin(angleRad); // -1 .. 1
-
-    // Scale by wind speed (clamped) for visual effect
-    const refSpeed = 12; // “full” wind for this visual
-    const strength = Math.min(Math.abs(this.windSpeed) / refSpeed, 1);
-
-    const signed = fullValueFactor * strength;
-
-    // Bullet drifts AWAY from wind direction:
-    // wind FROM the right (3 o'clock) pushes bullet LEFT -> negative X
-    this.impactX = -signed * this.maxImpactOffsetPx;
-    this.impactY = 0; // you can add a vertical component later if desired
-  }
-
-  // Arrow position on circumference (CSS)
-  get arrowX(): string {
-    const rad = (this.windAngleDeg - 90) * (Math.PI / 180);
-    return `${Math.cos(rad) * this.circleRadiusPx}px`;
-  }
-
-  get arrowY(): string {
-    const rad = (this.windAngleDeg - 90) * (Math.PI / 180);
-    return `${Math.sin(rad) * this.circleRadiusPx}px`;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Readouts
-  // ---------------------------------------------------------------------------
-
-  /** Clock label like "3 o'clock" based on windAngleDeg (FROM direction, target at 12) */
-  get windClockLabel(): string {
-    const hour = this.degreesToClock(this.windAngleDeg);
-    return `${hour} o'clock`;
-  }
-
-  /** Crosswind factor 0–100% */
+  // Crosswind % of a pure 90° crosswind
   get crosswindPercent(): number {
     const angleRad = (this.windAngleDeg * Math.PI) / 180;
     const factor = Math.abs(Math.sin(angleRad)); // 0..1
     return Math.round(factor * 100);
+  }
+
+  // When user edits wind speed
+  onWindSpeedChange(value: number | null): void {
+    this.windSpeed = value ?? 0;
+    this.computeImpact();
+  }
+
+  // When user edits the clock value
+  onWindClockChange(): void {
+    this.syncAngleFromClock();
+    this.computeImpact();
+  }
+
+  // Map clock → angle (12 = 0°, 3 = 90°, 6 = 180°, 9 = 270°)
+  private syncAngleFromClock(): void {
+    let c = this.windClock ?? 12;
+    c = ((c - 1) % 12 + 12) % 12 + 1; // clamp to 1..12
+    this.windClock = c;
+
+    let deg = c * 30;
+    if (deg >= 360) deg = 0;
+    this.windAngleDeg = deg;
+  }
+
+  // Map angle → nearest clock number
+  private syncClockFromAngle(): void {
+    this.windClock = this.degreesToClock(this.windAngleDeg);
+  }
+
+  // ---------------- Pointer / drag handling ----------------
+
+  onCirclePointerDown(event: PointerEvent): void {
+    event.preventDefault();
+    this.isDragging = true;
+    this.updateAngleFromPointer(event);
+  }
+
+  @HostListener('window:pointermove', ['$event'])
+  onWindowPointerMove(event: PointerEvent): void {
+    if (!this.isDragging) return;
+    this.updateAngleFromPointer(event);
+  }
+
+  @HostListener('window:pointerup')
+  @HostListener('window:pointercancel')
+  endDrag(): void {
+    this.isDragging = false;
+  }
+
+  private updateAngleFromPointer(event: PointerEvent): void {
+    const rect = this.circleRef.nativeElement.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    const dx = event.clientX - cx;
+    const dy = event.clientY - cy;
+
+    // 0° at top (12 o'clock), clockwise positive
+    let deg = (Math.atan2(dx, -dy) * 180) / Math.PI;
+    if (deg < 0) deg += 360;
+
+    this.windAngleDeg = Math.round(deg);
+    this.syncClockFromAngle();
+    this.computeImpact();
+  }
+
+  // ---------------- Physics-ish visualisation ----------------
+
+  private computeImpact(): void {
+    // Normalise speed into 0..1 (cap at 20 units)
+    const speedNorm = Math.max(0, Math.min(this.windSpeed, 20)) / 20;
+    const angleRad = (this.windAngleDeg * Math.PI) / 180;
+
+    // Horizontal (left/right) component ~ sin
+    const cross = Math.sin(angleRad);
+
+    // Vertical (up/down) component ~ cos
+    // (smaller influence, just to show high/low on head/tail winds)
+    const vertical = Math.cos(angleRad);
+
+    const maxRadius = this.circleDiameter / 2 - 20;
+    const driftRadius = maxRadius * speedNorm;
+
+    // X right positive, Y down positive (we invert Y so "up" on screen is positive lift)
+    this.impactX = cross * driftRadius;
+    this.impactY = -vertical * driftRadius * 0.4; // 40% of lateral effect
   }
 
   private degreesToClock(deg: number): number {

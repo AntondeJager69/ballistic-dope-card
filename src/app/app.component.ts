@@ -48,6 +48,7 @@ interface ReportRequest {
     SessionTabComponent,
     RiflesTabComponent,
     VenuesTabComponent,
+     CommonModule,          // ⬅️ add this
     HistoryTabComponent,
     LoadDevTabComponent,
     WindEffectToolComponent

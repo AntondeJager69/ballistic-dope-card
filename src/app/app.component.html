@@ -20,15 +20,44 @@
     <div class="flex-1 flex flex-col bg-gray-900/70 rounded-3xl shadow-lg p-2.5 space-y-3 border border-gray-800">
 
       <!-- MENU TAB -->
-      <ng-container *ngIf="currentTab === 'menu'; else otherTabs">
-        <div class="bg-[#111827] rounded-3xl p-2 flex-1 flex flex-col">
-          <!-- Main menu heading -->
-          <div class="px-1 pt-1 pb-1">
-            <h2 class="text-sm font-semibold text-gray-100 tracking-wide">
-              Main menu
-            </h2>
-          </div>
+<ng-container *ngIf="currentTab === 'menu'; else otherTabs">
 
+  <!-- FULL-SCREEN WIND EFFECT MODE -->
+  <ng-container *ngIf="selectedTool === 'windEffect'; else normalMenu">
+    <div class="bg-[#111827] rounded-3xl p-2 flex-1 flex flex-col">
+      <!-- Small header with back/minimise -->
+      <div class="flex items-center justify-between mb-2 px-1">
+        <button
+          class="text-[11px] text-gray-300"
+          (click)="onWindEffectToolClick()">
+          ← Back to menu
+        </button>
+
+        <div class="text-[11px] font-semibold text-gray-100">
+          Wind effect
+        </div>
+
+        <!-- Spacer to balance layout -->
+        <span class="w-10"></span>
+      </div>
+
+      <!-- Full-height wind effect tool -->
+      <div class="flex-1 flex items-center justify-center">
+        <app-wind-effect-tool></app-wind-effect-tool>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- NORMAL MENU (what you currently have) -->
+  <ng-template #normalMenu>
+    <div class="bg-[#111827] rounded-3xl p-2 flex-1 flex flex-col">
+      <!-- 🔽 put your existing Main menu, Reports, Tools & utilities stuff here 🔽 -->
+      <!-- Main menu heading -->
+      <div class="px-1 pt-1 pb-1">
+        <h2 class="text-sm font-semibold text-gray-100 tracking-wide">
+          Main menu
+        </h2>
+      </div>
           <!-- Main menu buttons ULTRA COMPACT -->
           <div class="space-y-2 mt-1">
             <!-- Start Session -->
@@ -251,37 +280,6 @@
               </div>
             </div>
 
-
-            <!-- Second icon row: Wind Effect -->
-            <div class="mt-2 flex justify-center">
-              <div class="flex flex-col items-center">
-                <button
-                  class="w-10 h-10 rounded-full bg-black flex items-center justify-center shadow-lg border border-gray-600"
-                  (click)="onWindEffectToolClick()">
-                  <!-- Simple wind arrow icon -->
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    class="w-5 h-5">
-                    <circle cx="12" cy="12" r="9" class="fill-transparent stroke-white" stroke-width="1" />
-                    <path
-                      class="stroke-white"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      d="M6 12h9M12 8l3 4-3 4" />
-                  </svg>
-                </button>
-
-                <span
-                  class="mt-1 text-[9px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
-                  Wind effect
-                </span>
-                <span class="text-[8px] text-gray-500 italic mt-0.5">
-                  {{ selectedTool === 'windEffect' ? 'Tap to close' : 'Tap to open' }}
-                </span>
-              </div>
-            </div>
-
             <!-- Kestrel details (only when selected) -->
             <div *ngIf="selectedTool === 'kestrel'" class="mt-2 space-y-1 text-[10px]">
               <p [ngClass]="kestrelError ? 'text-red-400' : 'text-gray-300'">
@@ -391,12 +389,13 @@
             <div *ngIf="selectedTool === 'windEffect'" class="mt-2 bg-black/40 rounded-2xl p-2.5 space-y-2 text-[11px]">
               <app-wind-effect-tool></app-wind-effect-tool>
             </div>
-          </div>
-        </div>
+                </div>
+              </div>
+        </ng-template>
       </ng-container>
-
-      <!-- OTHER TABS -->
-      <ng-template #otherTabs>
+      
+            <!-- OTHER TABS -->
+            <ng-template #otherTabs>
         <div *ngIf="currentTab === 'rifles'">
           <app-rifles-tab></app-rifles-tab>
         </div>

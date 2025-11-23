@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, Output, EventEmitter } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../data.service';
 import {
@@ -18,7 +18,6 @@ interface KestrelSnapshot {
   temperatureC: number;
   humidityPercent: number;
   pressureHpa: number;
-  densityAltitudeM: number;
   windSpeedMph: number;
   windClock: number; // 1–12
 }
@@ -35,10 +34,13 @@ export class SessionTabComponent implements OnInit {
 
   rifles: Rifle[] = [];
   venues: Venue[] = [];
+  // Notify parent app when user wants to jump to History
+  @Output() jumpToHistory = new EventEmitter<void>();
 
-  selectedRifleId: number | null = null;
-  selectedVenueId: number | null = null;
-  selectedSubRangeId: number | null = null;
+  // IDs used in the HTML template
+  rifleId: number | null = null;
+  venueId: number | null = null;
+  subRangeId: number | null = null;
 
   title = '';
   environment: Environment = {};
@@ -61,7 +63,7 @@ export class SessionTabComponent implements OnInit {
   kestrelError: string | null = null;
   kestrelIsConnecting = false;
 
-  // NEW: track current device + auto-disconnect timer
+  // Track current device + auto-disconnect timer
   private kestrelDeviceId: string | null = null;
   private kestrelAutoDisconnectTimer: any | null = null;
 
@@ -75,7 +77,7 @@ export class SessionTabComponent implements OnInit {
   // ---------- Derived getters ----------
 
   get selectedVenue(): Venue | undefined {
-    return this.venues.find(v => v.id === this.selectedVenueId);
+    return this.venues.find(v => v.id === this.venueId);
   }
 
   get subRanges(): SubRange[] {
@@ -85,7 +87,7 @@ export class SessionTabComponent implements OnInit {
 
   get selectedSubRange(): SubRange | undefined {
     const list = this.subRanges;
-    return list.find(sr => sr.id === this.selectedSubRangeId);
+    return list.find(sr => sr.id === this.subRangeId);
   }
 
   get distanceOptions(): number[] {
@@ -124,54 +126,59 @@ export class SessionTabComponent implements OnInit {
     else if (speed < 8) intensity = 'Medium wind – expect noticeable drift.';
     else intensity = 'Strong wind – expect significant drift.';
 
+    // Note: variable is named windSpeedMps but we describe in mph here; keep text as-is for now.
     return `Wind from ${c} o'clock at ${speed} mph: expect ${directionText}. ${intensity}`;
+  }
+
+  // Called by (ngModelChange) in the template – logic is in the getter
+  updateWindHint(): void {
+    // no-op: windHint is computed on the fly
   }
 
   // ---------- Setup step ----------
 
-  onVenueChange() {
+  onVenueChange(): void {
     const srs = this.subRanges;
     if (srs.length > 0) {
-      this.selectedSubRangeId = srs[0].id;
+      this.subRangeId = srs[0].id;
     } else {
-      this.selectedSubRangeId = null;
+      this.subRangeId = null;
     }
     this.selectedDistances = [];
   }
 
-  onSubRangeChange() {
-    this.selectedDistances = [];
+  canGoToEnvironment(): boolean {
+    if (!this.rifleId) return false;
+    if (!this.venueId) return false;
+    // subRange is optional – you allow "Whole venue / no sub-range"
+    return true;
   }
 
-  nextFromSetup() {
-    if (!this.title.trim()) {
-      alert('Please enter a session title.');
-      return;
-    }
-    if (!this.selectedRifleId) {
+  goToEnvironmentStep(): void {
+    if (!this.rifleId) {
       alert('Please select a rifle.');
       return;
     }
-    if (!this.selectedVenueId) {
+    if (!this.venueId) {
       alert('Please select a venue.');
       return;
     }
-    if (!this.selectedSubRangeId) {
-      alert('Please select a sub-range at the venue.');
-      return;
-    }
+    // Sub-range can be null (whole venue)
 
     this.step = 'environment';
   }
 
+  cancelSession(): void {
+    this.newSession();
+    this.step = 'setup';
+  }
+
   // ---------- Kestrel integration ----------
 
-   // Real Kestrel Bluetooth connection using Capacitor BLE (Android)
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  // NEW: clear any existing auto-disconnect timer
   private clearKestrelAutoDisconnect(): void {
     if (this.kestrelAutoDisconnectTimer) {
       clearTimeout(this.kestrelAutoDisconnectTimer);
@@ -179,21 +186,6 @@ export class SessionTabComponent implements OnInit {
     }
   }
 
-  // NEW: schedule a hard disconnect + reset after 1 minute
-  private scheduleKestrelAutoDisconnect(): void {
-    this.clearKestrelAutoDisconnect();
-
-    if (!this.kestrelConnected || !this.kestrelDeviceId) {
-      return;
-    }
-
-    this.kestrelAutoDisconnectTimer = setTimeout(() => {
-      console.log('Kestrel auto-disconnect: 60 seconds elapsed, disconnecting…');
-      void this.forceKestrelDisconnect();
-    }, 60_000); // 1 minute
-  }
-
-  // NEW: force disconnect + reset Kestrel state (keep environment values)
   private async forceKestrelDisconnect(): Promise<void> {
     this.clearKestrelAutoDisconnect();
 
@@ -209,12 +201,24 @@ export class SessionTabComponent implements OnInit {
     this.kestrelIsConnecting = false;
     this.kestrelDeviceId = null;
     this.kestrelStatus = 'Not connected (auto-disconnected after 1 minute)';
-    // We intentionally do NOT clear environment.* so the imported values stay
-    // available for the session.
+    // Intentionally do NOT clear environment.* so values stay for the session
+  }
+
+  private scheduleKestrelAutoDisconnect(): void {
+    this.clearKestrelAutoDisconnect();
+
+    if (!this.kestrelConnected || !this.kestrelDeviceId) {
+      return;
+    }
+
+    this.kestrelAutoDisconnectTimer = setTimeout(() => {
+      console.log('Kestrel auto-disconnect: 60 seconds elapsed, disconnecting…');
+      void this.forceKestrelDisconnect();
+    }, 60_000);
   }
 
   async connectKestrelBluetooth(): Promise<void> {
-    // Clean up any previous timer/connection before starting a new one
+    // Clean up previous timer/connection
     this.clearKestrelAutoDisconnect();
     if (this.kestrelConnected && this.kestrelDeviceId) {
       try {
@@ -231,13 +235,10 @@ export class SessionTabComponent implements OnInit {
     this.kestrelIsConnecting = true;
     this.kestrelStatus = 'Scanning for Kestrel…';
 
-    // Correct Kestrel Weather service + Sensor Measurements characteristic
-    // from your getServices() output + Weather Protocol:
     const kestrelServiceUuid = '03290000-eab4-dea1-b24e-44ec023874db';
     const sensorMeasurementsUuid = '03290310-eab4-dea1-b24e-44ec023874db';
 
     try {
-      // 1) Init BLE (Android 12+ friendly)
       await BleClient.initialize({ androidNeverForLocation: true });
 
       const enabled = await BleClient.isEnabled().catch(() => true);
@@ -246,7 +247,6 @@ export class SessionTabComponent implements OnInit {
         await BleClient.requestEnable();
       }
 
-      // 2) Scan for devices and pick the first that looks like your ELITE Kestrel
       let foundDevice: any = null;
 
       this.kestrelStatus = 'Scanning for Kestrel (up to 8s)…';
@@ -263,9 +263,9 @@ export class SessionTabComponent implements OnInit {
             const lower = name.toLowerCase();
 
             const looksLikeKestrel =
-              lower.startsWith('elite') ||       // "ELITE - 2998963"
+              lower.startsWith('elite') ||
               lower.includes('elite') ||
-              lower.includes('2998') ||          // your serial fragment
+              lower.includes('2998') ||
               lower.includes('kestrel') ||
               lower.startsWith('k5') ||
               lower.startsWith('k7') ||
@@ -280,7 +280,6 @@ export class SessionTabComponent implements OnInit {
         }
       );
 
-      // Wait up to 8 seconds for a match
       const timeoutMs = 10000;
       const start = Date.now();
       while (!foundDevice && Date.now() - start < timeoutMs) {
@@ -305,17 +304,14 @@ export class SessionTabComponent implements OnInit {
       this.kestrelStatus = `Connecting to ${device.name || device.deviceId}…`;
       console.log('Connecting to device:', device);
 
-      // 3) Connect
       await BleClient.connect(device.deviceId, (id) => {
         console.log('Kestrel disconnected', id);
         this.kestrelConnected = false;
-        // If the device drops the connection from its side, also clear timer + id
         this.clearKestrelAutoDisconnect();
         this.kestrelDeviceId = null;
         this.kestrelStatus = 'Not connected';
       });
 
-      // 4) Discover all services / characteristics and log them
       let services: any[] = [];
       try {
         services = await BleClient.getServices(device.deviceId);
@@ -327,7 +323,6 @@ export class SessionTabComponent implements OnInit {
         console.warn('getServices failed (not fatal):', e);
       }
 
-      // Find the Kestrel Weather service
       const service = services.find(s =>
         s.uuid?.toLowerCase() === kestrelServiceUuid.toLowerCase()
       );
@@ -342,7 +337,6 @@ export class SessionTabComponent implements OnInit {
         return;
       }
 
-      // Find the Sensor Measurements characteristic in that service
       const char = (service.characteristics || []).find((c: any) =>
         c.uuid?.toLowerCase() === sensorMeasurementsUuid.toLowerCase()
       );
@@ -357,7 +351,6 @@ export class SessionTabComponent implements OnInit {
         return;
       }
 
-      // 5) Read the Sensor Measurements characteristic (single read)
       const value = await BleClient.read(
         device.deviceId,
         kestrelServiceUuid,
@@ -373,8 +366,7 @@ export class SessionTabComponent implements OnInit {
                 : new Uint8Array(value as any).buffer
             );
 
-
-      // Byte layout (still our current best guess):
+      // Byte layout guess:
       // wind, temp, humidity, pressure – each 2 bytes, LE, x10
       const windRaw = dv.getUint16(0, true);     // m/s * 10
       const tempRaw = dv.getInt16(2, true);      // °C * 10
@@ -400,11 +392,11 @@ export class SessionTabComponent implements OnInit {
       this.environment.pressureHpa = pressureHpa;
       this.environment.windSpeedMps = parseFloat(windMph.toFixed(1));
 
+      // NOTE: DA explicitly removed here – we do not read or store DA in sessions.
       this.kestrelData = {
         temperatureC: tempC,
         humidityPercent: humidity,
         pressureHpa,
-        densityAltitudeM: this.environment.densityAltitudeM ?? 0,
         windSpeedMph: parseFloat(windMph.toFixed(1)),
         windClock: this.windClock ?? 12
       };
@@ -418,15 +410,13 @@ export class SessionTabComponent implements OnInit {
       this.kestrelError = err?.message || String(err);
     } finally {
       this.kestrelIsConnecting = false;
-      // After we have data and are marked as connected, keep the link
-      // alive for 1 minute, then auto-disconnect and reset Kestrel state.
       this.scheduleKestrelAutoDisconnect();
     }
   }
 
   // ---------- Environment step ----------
 
-  nextFromEnvironment() {
+  nextFromEnvironment(): void {
     // Convert windClock -> approximate windDirectionDeg (0° = from target / headwind)
     if (this.windClock != null) {
       let c = ((this.windClock - 1) % 12) + 1; // 1..12
@@ -440,9 +430,14 @@ export class SessionTabComponent implements OnInit {
     this.step = 'shots';
   }
 
+  // Alias for template name
+  backToEnvironmentStep(): void {
+    this.step = 'environment';
+  }
+
   // ---------- Shot planning step ----------
 
-  toggleDistance(d: number) {
+  toggleDistance(d: number): void {
     if (this.selectedDistances.includes(d)) {
       this.selectedDistances = this.selectedDistances.filter(x => x !== d);
     } else {
@@ -450,19 +445,23 @@ export class SessionTabComponent implements OnInit {
     }
   }
 
-  goShoot() {
+  canCompleteSession(): boolean {
+    return this.selectedDistances.length > 0;
+  }
+
+  completeSession(): void {
     if (this.selectedDistances.length === 0) {
       alert('Select at least one distance to shoot.');
       return;
     }
-    if (!this.selectedRifleId || !this.selectedVenueId || !this.selectedSubRangeId) {
-      alert('Setup is incomplete. Please go back and select rifle, venue and sub-range.');
+    if (!this.rifleId || !this.venueId) {
+      alert('Setup is incomplete. Please go back and select rifle and venue.');
       return;
     }
 
     // Build dope rows for each selected distance
     this.dopeRows = this.selectedDistances.map(distance => ({
-      subRangeId: this.selectedSubRangeId!,
+      subRangeId: this.subRangeId ?? undefined,
       distanceM: distance
     }));
 
@@ -483,8 +482,8 @@ export class SessionTabComponent implements OnInit {
 
     const sessionToSave: Omit<Session, 'id'> = {
       date: new Date().toISOString(),
-      rifleId: this.selectedRifleId,
-      venueId: this.selectedVenueId,
+      rifleId: this.rifleId,
+      venueId: this.venueId,
       title: this.title || undefined,
       environment: this.environment,
       dope: this.dopeRows,
@@ -496,7 +495,7 @@ export class SessionTabComponent implements OnInit {
 
     // increment rifle round count using planned shot count (if set)
     if (this.shotCount && this.shotCount > 0) {
-      this.data.incrementRifleRoundCount(this.selectedRifleId, this.shotCount);
+      this.data.incrementRifleRoundCount(this.rifleId!, this.shotCount);
     }
 
     this.completeMessage =
@@ -506,20 +505,32 @@ export class SessionTabComponent implements OnInit {
 
   // ---------- Navigation ----------
 
-  backToSetup() {
+  backToSetup(): void {
     this.step = 'setup';
+  }  onJumpToHistory(): void {
+    // Optional: reset the wizard so Sessions tab is clean next time
+    this.newSession();
+    // Tell AppComponent to switch to History tab
+    this.jumpToHistory.emit();
   }
 
-  backToEnvironment() {
+
+  backToEnvironment(): void {
     this.step = 'environment';
   }
 
-  newSession() {
+  // Called from the Step 4 button – here we just reset the wizard
+  returnToMenu(): void {
+    this.newSession();
+    this.step = 'setup';
+  }
+
+  newSession(): void {
     this.step = 'setup';
     this.title = '';
-    this.selectedRifleId = null;
-    this.selectedVenueId = null;
-    this.selectedSubRangeId = null;
+    this.rifleId = null;
+    this.venueId = null;
+    this.subRangeId = null;
     this.environment = {};
     this.windClock = null;
     this.shotCount = null;
@@ -535,7 +546,6 @@ export class SessionTabComponent implements OnInit {
     this.kestrelError = null;
     this.kestrelIsConnecting = false;
 
-    // Also clear any pending auto-disconnect when starting a fresh session
     this.clearKestrelAutoDisconnect();
     this.kestrelDeviceId = null;
 

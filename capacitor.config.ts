@@ -1,9 +1,10 @@
-import type { CapacitorConfig } from '@capacitor/cli';
+import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.gunstuff.dopecard',
-  appName: 'BallisticDopeCard',
-  webDir: 'dist/ballistic-dope-card/browser'
+  appId: 'ballistic.dopecard',   // or your existing appId, keep it
+  appName: 'ballistic-dope-card',
+  webDir: 'dist/ballistic-dope-card/browser',
+  bundledWebRuntime: false,
 };
 
 export default config;

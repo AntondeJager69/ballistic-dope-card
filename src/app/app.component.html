@@ -1,9 +1,9 @@
-<div class="min-h-screen bg-black flex justify-center items-stretch text-white">
+<div class="min-h-screen bg-black text-white flex justify-center px-2 pt-4 pb-8">
   <!-- Phone frame -->
-  <div class="w-full max-w-sm flex flex-col p-4">
+  <div class="w-full max-w-sm flex flex-col">
 
     <!-- Title -->
-    <div class="text-center mb-4">
+    <div class="text-center mb-3">
       <h1 class="text-base font-semibold">
         {{ appTitle }}
       </h1>
@@ -16,349 +16,474 @@
       <div class="mt-2 h-[1px] bg-gray-700 mx-auto w-40"></div>
     </div>
 
-    <!-- Main content area -->
-    <div class="flex-1 overflow-y-auto pb-16">
+    <!-- Main content card -->
+    <div class="flex-1 flex flex-col bg-gray-900/70 rounded-3xl shadow-lg p-2.5 space-y-3 border border-gray-800">
+
       <!-- MENU TAB -->
-      <div *ngIf="currentTab === 'menu'" class="space-y-3">
-
-        <!-- Main menu card -->
-        <div class="bg-gray-900 rounded-2xl p-4 shadow space-y-3">
-          <h2 class="text-sm font-semibold mb-1">Main menu</h2>
-
-          <!-- Start Event -->
-          <button
-            class="w-full px-3 py-2 rounded-xl bg-orange-500 text-black text-sm font-semibold"
-            (click)="startEvent()">
-            Start event
-          </button>
-
-          <!-- Load Development -->
-          <button
-            class="w-full px-3 py-2 rounded-xl bg-gray-700 text-sm"
-            (click)="openLoadDevelopment()">
-            Load development
-          </button>
-
-          <!-- Reports -->
-          <button
-            class="w-full px-3 py-2 rounded-xl bg-gray-700 text-sm"
-            (click)="openReports()">
-            Reports
-          </button>
-
-          <!-- Tools & utilities button -->
-          <button
-            class="w-full px-3 py-2 rounded-xl bg-gray-700 text-sm"
-            (click)="openTools()">
-            Tools & utilities
-          </button>
-        </div>
-
-        <!-- Reports mini-wizard -->
-        <div *ngIf="showReportsForm" class="bg-gray-900 rounded-2xl p-4 shadow space-y-2">
-          <h3 class="text-sm font-semibold">Reports – what do you need?</h3>
-          <p class="text-[11px] text-gray-300">
-            This will query your History data. Examples: previous dope at the same venue,
-            results with a specific rifle, or all sessions in a date range.
-          </p>
-
-          <label class="flex flex-col text-[11px]">
-            Describe the information you want
-            <input
-              [(ngModel)]="reportTopic"
-              name="reportTopic"
-              placeholder="e.g. Last 5 sessions at Bloukrans, 500 m"
-              class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
-          </label>
-
-          <label class="flex flex-col text-[11px]">
-            Extra details (optional)
-            <textarea
-              [(ngModel)]="reportDetails"
-              name="reportDetails"
-              rows="2"
-              class="mt-1 px-2 py-1 rounded bg-black border border-gray-700"></textarea>
-          </label>
-
-          <div class="flex justify-end gap-2 mt-2">
-            <button
-              class="px-3 py-1 text-xs rounded bg-gray-700"
-              (click)="showReportsForm = false">
-              Cancel
-            </button>
-            <button
-              class="px-3 py-1 text-xs rounded bg-orange-500 text-black font-semibold"
-              (click)="submitReportRequest()">
-              Save request
-            </button>
-          </div>
-        </div>
-
-        <!-- TOOLS BLOCK (shown only if tools button toggled on) -->
-        <div *ngIf="showTools" class="bg-gray-900 rounded-2xl p-4 shadow space-y-3">
-          <h2 class="text-sm font-semibold mb-1">Tools & utilities</h2>
-
-          <!-- Icon row: Kestrel + Converter -->
-          <div class="mt-2 flex justify-center gap-10">
-
-            <!-- Kestrel quick env -->
-            <div class="flex flex-col items-center">
-              <button
-                class="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-                [ngClass]="{
-                  'bg-orange-500 hover:scale-105': !kestrelIsConnecting && !kestrelError && !kestrelData,
-                  'bg-blue-500 animate-pulse': kestrelIsConnecting,
-                  'bg-green-600 hover:scale-105': !kestrelIsConnecting && kestrelData && !kestrelError,
-                  'bg-red-600': kestrelError
-                }"
-                (click)="onKestrelToolClick()"
-                [disabled]="kestrelIsConnecting">
-
-                <!-- Simple "Kestrel" SVG icon -->
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  class="w-6 h-6">
-                  <!-- outer ring -->
-                  <circle cx="12" cy="12" r="9" class="fill-black/40" />
-                  <!-- vane / prop style blades -->
-                  <path
-                    class="fill-white"
-                    d="M12 4.5c.6 0 1 .4 1 1v4.1l3.1-1.8a1 1 0 0 1 1 1.7l-3.1 1.8 3.1 1.8a1 1 0 1 1-1 1.7L13 13.3v4.2a1 1 0 0 1-2 0v-4.2l-3.1 1.8a1 1 0 1 1-1-1.7l3.1-1.8-3.1-1.8a1 1 0 0 1 1-1.7L11 9.6V5.5c0-.6.4-1 1-1Z" />
-                </svg>
-              </button>
-
-              <span
-                class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
-                Kestrel quick env
-              </span>
-              <span class="text-[9px] text-gray-500 italic mt-0.5">
-                {{ selectedTool === 'kestrel' ? 'Tap to close' : 'Tap to read environment' }}
-              </span>
-            </div>
-
-            <!-- Mil / MOA converter icon -->
-            <div class="flex flex-col items-center">
-              <button
-                class="w-12 h-12 rounded-full bg-black flex items-center justify-center shadow-lg border border-gray-600"
-                (click)="onConverterToolClick()">
-                <!-- Crosshair / scope icon -->
-                <svg xmlns="http://www.w3.org/2000/svg"
-                     viewBox="0 0 24 24"
-                     class="w-6 h-6">
-                  <circle cx="12" cy="12" r="7" class="fill-transparent stroke-white" stroke-width="1" />
-                  <line x1="12" y1="3" x2="12" y2="7" class="stroke-white" stroke-width="1" />
-                  <line x1="12" y1="17" x2="12" y2="21" class="stroke-white" stroke-width="1" />
-                  <line x1="3" y1="12" x2="7" y2="12" class="stroke-white" stroke-width="1" />
-                  <line x1="17" y1="12" x2="21" y2="12" class="stroke-white" stroke-width="1" />
-                  <circle cx="12" cy="12" r="1.4" class="fill-white" />
-                </svg>
-              </button>
-
-              <span
-                class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
-                Mil ↔ MOA converter
-              </span>
-              <span class="text-[9px] text-gray-500 italic mt-0.5">
-                {{ selectedTool === 'converter' ? 'Tap to close' : 'Tap to open converter' }}
-              </span>
-            </div>
+      <ng-container *ngIf="currentTab === 'menu'; else otherTabs">
+        <div class="bg-[#111827] rounded-3xl p-2 flex-1 flex flex-col">
+          <!-- Main menu heading -->
+          <div class="px-1 pt-1 pb-1">
+            <h2 class="text-sm font-semibold text-gray-100 tracking-wide">
+              Main menu
+            </h2>
           </div>
 
-          <!-- Kestrel details (only when selected) -->
-          <div *ngIf="selectedTool === 'kestrel'" class="mt-3 space-y-1 text-[11px]">
-            <p [ngClass]="kestrelError ? 'text-red-400' : 'text-gray-300'">
-              {{ kestrelStatus }}
+          <!-- Main menu buttons ULTRA COMPACT -->
+          <div class="space-y-2 mt-1">
+            <!-- Start Session -->
+            <button
+              class="w-full px-3 py-2 rounded-2xl bg-orange-500 text-[13px] font-semibold text-black shadow hover:bg-orange-400 active:bg-orange-600 transition"
+              (click)="goToSessionsTab()">
+              Start Session
+            </button>
+
+            <!-- Load development -->
+            <button
+              class="w-full px-3 py-2 rounded-2xl bg-gray-700 text-[13px] text-gray-100 shadow-inner hover:bg-gray-600 active:bg-gray-500 transition"
+              (click)="setTab('loadDev')">
+              Load development
+            </button>
+
+            <!-- Reports -->
+            <button
+              class="w-full px-3 py-2 rounded-2xl bg-gray-700 text-[13px] text-gray-100 shadow-inner hover:bg-gray-600 active:bg-gray-500 transition"
+              (click)="toggleReportsForm()">
+              Reports
+            </button>
+
+            <!-- Tools & utilities -->
+            <button
+              class="w-full px-3 py-2 rounded-2xl bg-gray-700 text-[13px] text-gray-100 shadow-inner hover:bg-gray-600 active:bg-gray-500 transition"
+              (click)="openTools()">
+              Tools & utilities
+            </button>
+          </div>
+
+          <!-- Reports mini-wizard (collapsed by default) -->
+          <div *ngIf="showReportsForm" class="bg-gray-900 rounded-2xl p-3 shadow space-y-2 mt-3">
+            <h3 class="text-xs font-semibold">Reports – what do you need?</h3>
+            <p class="text-[11px] text-gray-300">
+              This will query your History data. Examples: previous dope at the same venue,
+              results with a specific rifle, or all sessions in a date range.
             </p>
 
-            <span class="text-[9px] text-gray-500" *ngIf="kestrelLastUpdate">
-              Last update: {{ kestrelLastUpdate | date:'shortTime' }}
-            </span>
+            <!-- Simple form fields -->
+            <div class="space-y-2 text-[11px]">
+              <div>
+                <label class="block text-gray-300 mb-0.5">Report type</label>
+                <select
+                  class="w-full bg-black border border-gray-700 rounded px-2 py-1 text-[11px]"
+                  [(ngModel)]="reportRequest.type">
+                  <option value="recent">Most recent sessions</option>
+                  <option value="rifle">By rifle</option>
+                  <option value="venue">By venue</option>
+                  <option value="dateRange">Date range</option>
+                </select>
+              </div>
 
-            <div *ngIf="kestrelData"
-                 class="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9px] text-gray-300 text-left">
-              <div>Temp:
-                <span class="font-semibold">
-                  {{ kestrelData.temperatureC | number:'1.1-1' }}°C
-                </span>
+              <div *ngIf="reportRequest.type === 'rifle'">
+                <label class="block text-gray-300 mb-0.5">Rifle</label>
+                <select
+                  class="w-full bg-black border border-gray-700 rounded px-2 py-1 text-[11px]"
+                  [(ngModel)]="reportRequest.rifleId">
+                  <option [ngValue]="null">Any</option>
+                  <option
+                    *ngFor="let r of riflesOptions"
+                    [ngValue]="r.id">
+                    {{ r.name }}
+                  </option>
+                </select>
               </div>
-              <div>Hum:
-                <span class="font-semibold">
-                  {{ kestrelData.humidityPercent | number:'1.0-1' }}%
-                </span>
+
+              <div *ngIf="reportRequest.type === 'venue'">
+                <label class="block text-gray-300 mb-0.5">Venue</label>
+                <select
+                  class="w-full bg-black border border-gray-700 rounded px-2 py-1 text-[11px]"
+                  [(ngModel)]="reportRequest.venueId">
+                  <option [ngValue]="null">Any</option>
+                  <option
+                    *ngFor="let v of venuesOptions"
+                    [ngValue]="v.id">
+                    {{ v.name }}
+                  </option>
+                </select>
               </div>
-              <div>Press:
-                <span class="font-semibold">
-                  {{ kestrelData.pressureHpa | number:'1.1-1' }} hPa
-                </span>
+
+              <!-- Date range fields (if chosen) -->
+              <div *ngIf="reportRequest.type === 'dateRange'" class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-gray-300 mb-0.5">From date</label>
+                  <input
+                    type="date"
+                    [(ngModel)]="reportRequest.dateFrom"
+                    class="w-full bg-black border border-gray-700 rounded px-2 py-1 text-[11px]" />
+                </div>
+                <div>
+                  <label class="block text-gray-300 mb-0.5">To date</label>
+                  <input
+                    type="date"
+                    [(ngModel)]="reportRequest.dateTo"
+                    class="w-full bg-black border border-gray-700 rounded px-2 py-1 text-[11px]" />
+                </div>
               </div>
-              <div>Wind:
-                <span class="font-semibold">
-                  {{ kestrelData.windSpeedMph | number:'1.1-1' }} mph
-                </span>
+
+              <!-- Result limit -->
+              <div>
+                <label class="block text-gray-300 mb-0.5">How many results?</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  [(ngModel)]="reportRequest.limit"
+                  class="w-full bg-black border border-gray-700 rounded px-2 py-1 text-[11px]" />
               </div>
+            </div>
+
+            <!-- Footer buttons -->
+            <div class="flex justify-end gap-2 mt-2">
+              <button
+                class="px-3 py-1 text-[10px] rounded bg-gray-700"
+                (click)="showReportsForm = false">
+                Cancel
+              </button>
+              <button
+                class="px-3 py-1 text-[10px] rounded bg-orange-500 text-black font-semibold"
+                (click)="submitReportRequest()">
+                Save request
+              </button>
             </div>
           </div>
 
-          <!-- Converter panel (only when selected) -->
-          <div *ngIf="selectedTool === 'converter'" class="mt-3 bg-black/40 rounded-2xl p-3 space-y-2 text-[11px]">
-            <div class="flex items-center justify-between mb-1">
-              <div class="font-semibold">Mil ↔ MOA converter</div>
-              <div class="text-[9px] text-gray-400">1 mil ≈ 3.438 MOA</div>
+          <!-- TOOLS BLOCK (shown only if tools button toggled on) -->
+          <div *ngIf="showTools" class="bg-gray-900 rounded-2xl p-3 shadow space-y-3 mt-3">
+            <h2 class="text-xs font-semibold mb-1">Tools & utilities</h2>
+
+                       <!-- Icon row: Kestrel + Converter -->
+            <div class="mt-1 flex justify-center gap-10">
+              <!-- Kestrel quick env -->
+              <div class="flex flex-col items-center">
+                <button
+                  class="w-12 h-12 rounded-full flex items-center justify-center shadow-lg border border-gray-600 transition-transform duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                  [ngClass]="{
+                    'bg-orange-500 hover:scale-105': !kestrelIsConnecting && !kestrelError && !kestrelData,
+                    'bg-blue-500 animate-pulse': kestrelIsConnecting,
+                    'bg-green-600 hover:scale-105': !kestrelIsConnecting && kestrelData && !kestrelError,
+                    'bg-red-600': kestrelError
+                  }"
+                  (click)="onKestrelToolClick()"
+                  [disabled]="kestrelIsConnecting">
+
+                  <!-- Simple "Kestrel" SVG icon -->
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    class="w-6 h-6">
+                    <circle cx="12" cy="12" r="9" class="fill-black/40" />
+                    <path
+                      class="fill-white"
+                      d="M12 4.5c.6 0 1 .4 1 1v4.1l3.1-1.8a1 1 0 0 1 1 1.7l-3.1 1.8 3.1 1.8a1 1 0 0 1-1 1.7L13 13.3v4.2a1 1 0 0 1-2 0v-4.2l-3.1 1.8a1 1 0 1 1-1-1.7l3.1-1.8-3.1-1.8a1 1 0 0 1 1-1.7L11 9.6V5.5c0-.6.4-1 1-1Z" />
+                  </svg>
+                </button>
+
+                <span
+                  class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
+                  Kestrel env
+                </span>
+                <span class="text-[9px] text-gray-500 italic mt-0.5">
+                  {{ selectedTool === 'kestrel' ? 'Tap to close' : 'Tap to read' }}
+                </span>
+              </div>
+
+              <!-- Mil / MOA converter icon -->
+              <div class="flex flex-col items-center">
+                <button
+                  class="w-12 h-12 rounded-full bg-black flex items-center justify-center shadow-lg border border-gray-600"
+                  (click)="onConverterToolClick()">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       viewBox="0 0 24 24"
+                       class="w-6 h-6">
+                    <circle cx="12" cy="12" r="7" class="fill-transparent stroke-white" stroke-width="1" />
+                    <line x1="12" y1="3" x2="12" y2="7" class="stroke-white" stroke-width="1" />
+                    <line x1="12" y1="17" x2="12" y2="21" class="stroke-white" stroke-width="1" />
+                    <line x1="3" y1="12" x2="7" y2="12" class="stroke-white" stroke-width="1" />
+                    <line x1="17" y1="12" x2="21" y2="12" class="stroke-white" stroke-width="1" />
+                    <circle cx="12" cy="12" r="1.4" class="fill-white" />
+                  </svg>
+                </button>
+
+                <span
+                  class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
+                  Mil ↔ MOA
+                </span>
+                <span class="text-[9px] text-gray-500 italic mt-0.5">
+                  {{ selectedTool === 'converter' ? 'Tap to close' : 'Tap to open' }}
+                </span>
+              </div>
             </div>
 
-            <!-- Mode toggle -->
-            <div class="flex bg-black/50 rounded-full p-0.5 text-[10px]">
-              <button
-                class="flex-1 px-2 py-1 rounded-full"
-                [ngClass]="converterMode === 'milToMoa'
-                  ? 'bg-orange-500 text-black font-semibold'
-                  : 'text-gray-300'"
-                (click)="converterMode = 'milToMoa'">
-                Mil → MOA
-              </button>
-              <button
-                class="flex-1 px-2 py-1 rounded-full"
-                [ngClass]="converterMode === 'moaToMil'
-                  ? 'bg-orange-500 text-black font-semibold'
-                  : 'text-gray-300'"
-                (click)="converterMode = 'moaToMil'">
-                MOA → Mil
-              </button>
+            <!-- Second icon row: Wind Effect -->
+            <div class="mt-3 flex justify-center">
+              <div class="flex flex-col items-center">
+                <button
+                  class="w-12 h-12 rounded-full bg-black flex items-center justify-center shadow-lg border border-gray-600"
+                  (click)="onWindEffectToolClick()">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    class="w-6 h-6">
+                    <circle cx="12" cy="12" r="9" class="fill-transparent stroke-white" stroke-width="1" />
+                    <path
+                      class="stroke-white"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      d="M6 12h9M12 8l3 4-3 4" />
+                  </svg>
+                </button>
+
+                <span
+                  class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
+                  Wind effect
+                </span>
+                <span class="text-[9px] text-gray-500 italic mt-0.5">
+                  {{ selectedTool === 'windEffect' ? 'Tap to close' : 'Tap to open' }}
+                </span>
+              </div>
             </div>
 
-            <!-- Input / Output -->
-            <div class="flex items-center gap-2 mt-2">
-              <label class="flex-1 flex flex-col">
-                <span class="text-[10px] text-gray-300">
-                  Enter value
-                </span>
-                <input
-                  type="number"
-                  step="0.01"
-                  [(ngModel)]="converterInput"
-                  name="converterInput"
-                  class="mt-1 px-2 py-1 rounded bg-black border border-gray-700 text-[11px]" />
-              </label>
 
-              <div class="flex-1 flex flex-col">
-                <span class="text-[10px] text-gray-300">
-                  Result
+            <!-- Second icon row: Wind Effect -->
+            <div class="mt-2 flex justify-center">
+              <div class="flex flex-col items-center">
+                <button
+                  class="w-10 h-10 rounded-full bg-black flex items-center justify-center shadow-lg border border-gray-600"
+                  (click)="onWindEffectToolClick()">
+                  <!-- Simple wind arrow icon -->
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    class="w-5 h-5">
+                    <circle cx="12" cy="12" r="9" class="fill-transparent stroke-white" stroke-width="1" />
+                    <path
+                      class="stroke-white"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      d="M6 12h9M12 8l3 4-3 4" />
+                  </svg>
+                </button>
+
+                <span
+                  class="mt-1 text-[9px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
+                  Wind effect
                 </span>
-                <div class="mt-1 px-2 py-1 rounded bg-black border border-gray-800 text-[11px]">
-                  <ng-container *ngIf="converterOutput !== null; else noVal">
-                    {{ converterOutput }}
-                    <span class="text-[10px] text-gray-400 ml-1">
-                      {{ converterMode === 'milToMoa' ? 'MOA' : 'mil' }}
-                    </span>
-                  </ng-container>
-                  <ng-template #noVal>
-                    <span class="text-gray-600 text-[10px]">
-                      –
-                    </span>
-                  </ng-template>
+                <span class="text-[8px] text-gray-500 italic mt-0.5">
+                  {{ selectedTool === 'windEffect' ? 'Tap to close' : 'Tap to open' }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Kestrel details (only when selected) -->
+            <div *ngIf="selectedTool === 'kestrel'" class="mt-2 space-y-1 text-[10px]">
+              <p [ngClass]="kestrelError ? 'text-red-400' : 'text-gray-300'">
+                {{ kestrelStatus }}
+              </p>
+
+              <span class="text-[8px] text-gray-500" *ngIf="kestrelLastUpdated">
+                Last updated:
+                {{ kestrelLastUpdated | date:'yyyy-MM-dd HH:mm:ss' }}
+              </span>
+
+              <div *ngIf="kestrelData" class="mt-1 grid grid-cols-2 gap-x-2 gap-y-1 text-[9px]">
+                <div>
+                  Temp:
+                  <span class="font-semibold text-gray-100">
+                    {{ kestrelData.temperatureC }} °C
+                  </span>
+                </div>
+                <div>
+                  Pressure:
+                  <span class="font-semibold text-gray-100">
+                    {{ kestrelData.pressureInHg | number:'1.2-2' }} inHg
+                  </span>
+                </div>
+                <div>
+                  Humidity:
+                  <span class="font-semibold text-gray-100">
+                    {{ kestrelData.humidityPercent }} %
+                  </span>
+                </div>
+                <div>
+                  Wind:
+                  <span class="font-semibold text-gray-100">
+                    {{ kestrelData.windSpeedMps | number:'1.1-1' }} m/s
+                  </span>
+                  <span class="text-[8px] text-gray-400 ml-1">
+                    dir: {{ kestrelData.windDirectionClock }} o’clock
+                  </span>
+                </div>
+                <!-- DA removed -->
+              </div>
+            </div>
+
+            <!-- Converter panel (only when selected) -->
+            <div *ngIf="selectedTool === 'converter'" class="mt-2 bg-black/40 rounded-2xl p-2.5 space-y-2 text-[10px]">
+              <div class="flex items-center justify-between mb-1">
+                <div class="font-semibold">Mil ↔ MOA converter</div>
+                <div class="text-[8px] text-gray-400">1 mil ≈ 3.438 MOA</div>
+              </div>
+
+              <!-- Mode toggle -->
+              <div class="flex bg-black/50 rounded-full p-0.5 text-[9px]">
+                <button
+                  class="flex-1 px-2 py-1 rounded-full"
+                  [ngClass]="converterMode === 'milToMoa'
+                    ? 'bg-orange-500 text-black font-semibold'
+                    : 'text-gray-300'"
+                  (click)="converterMode = 'milToMoa'">
+                  Mil → MOA
+                </button>
+                <button
+                  class="flex-1 px-2 py-1 rounded-full"
+                  [ngClass]="converterMode === 'moaToMil'
+                    ? 'bg-orange-500 text-black font-semibold'
+                    : 'text-gray-300'"
+                  (click)="converterMode = 'moaToMil'">
+                  MOA → Mil
+                </button>
+              </div>
+
+              <!-- Input / Output -->
+              <div class="flex items-center gap-2 mt-2">
+                <label class="flex-1 flex flex-col">
+                  <span class="text-[9px] text-gray-300">
+                    Enter value
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    [(ngModel)]="converterInput"
+                    name="converterInput"
+                    class="mt-1 px-2 py-1 rounded bg-black border border-gray-700 text-[10px]" />
+                </label>
+
+                <div class="flex-1 flex flex-col">
+                  <span class="text-[9px] text-gray-300">
+                    Result
+                  </span>
+                  <div class="mt-1 px-2 py-1 rounded bg-black border border-gray-800 text-[10px]">
+                    <ng-container *ngIf="converterOutput !== null; else noVal">
+                      {{ converterOutput }}
+                      <span class="text-[9px] text-gray-400 ml-1">
+                        {{ converterMode === 'milToMoa' ? 'MOA' : 'mil' }}
+                      </span>
+                    </ng-container>
+                    <ng-template #noVal>
+                      <span class="text-gray-600 text-[9px]">
+                        –
+                      </span>
+                    </ng-template>
+                  </div>
                 </div>
               </div>
             </div>
+
+            <!-- Wind effect panel (only when selected) -->
+            <div *ngIf="selectedTool === 'windEffect'" class="mt-2 bg-black/40 rounded-2xl p-2.5 space-y-2 text-[11px]">
+              <app-wind-effect-tool></app-wind-effect-tool>
+            </div>
           </div>
         </div>
+      </ng-container>
 
-      </div>
+      <!-- OTHER TABS -->
+      <ng-template #otherTabs>
+        <div *ngIf="currentTab === 'rifles'">
+          <app-rifles-tab></app-rifles-tab>
+        </div>
 
-      <!-- RIFLES TAB -->
-      <div *ngIf="currentTab === 'rifles'">
-        <app-rifles-tab></app-rifles-tab>
-      </div>
+        <div *ngIf="currentTab === 'venues'">
+          <app-venues-tab></app-venues-tab>
+        </div>
 
-      <!-- VENUES TAB -->
-      <div *ngIf="currentTab === 'venues'">
-        <app-venues-tab></app-venues-tab>
-      </div>
+        <div *ngIf="currentTab === 'sessions'">
+  <app-session-tab (jumpToHistory)="setTab('history')"></app-session-tab>
+</div>
 
-      <!-- SESSION TAB -->
-      <div *ngIf="currentTab === 'session'">
-        <app-session-tab></app-session-tab>
-      </div>
 
-      <!-- HISTORY TAB -->
-      <div *ngIf="currentTab === 'history'">
-        <app-history-tab></app-history-tab>
-      </div>
+        <div *ngIf="currentTab === 'history'">
+          <app-history-tab></app-history-tab>
+        </div>
 
-      <!-- LOAD DEVELOPMENT TAB -->
-      <div *ngIf="currentTab === 'loaddev'">
-        <app-load-dev-tab></app-load-dev-tab>
-      </div>
+        <div *ngIf="currentTab === 'loadDev'">
+          <app-load-dev-tab></app-load-dev-tab>
+        </div>
+      </ng-template>
     </div>
 
-    <!-- Bottom tab bar (inside the phone frame, lifted away from phone nav) -->
-    <div class="mt-2 bg-black/95 border-t border-gray-800 py-2 pb-6 relative bottom-3">
-      <div class="flex justify-between text-[11px]">
+    <!-- Bottom navigation bar (already compact) -->
+    <div class="mt-4 mb-6 w-full flex justify-center translate-y-[-10px]">
+      <div class="w-full bg-black/60 rounded-2xl border border-gray-800 px-1 py-1">
+        <div class="flex">
+          <button
+            class="flex-1 min-w-0 flex flex-col items-center"
+            (click)="setTab('menu')">
+            <span
+              class="block w-full text-[11px] leading-tight px-1.5 py-1 rounded-full text-center"
+              [ngClass]="currentTab === 'menu'
+                ? 'bg-orange-500 text-black font-semibold'
+                : 'text-gray-300'">
+              Menu
+            </span>
+          </button>
 
-        <!-- Menu -->
-        <button
-          class="flex-1 flex flex-col items-center"
-          (click)="setTab('menu')">
-          <span
-            class="px-3 py-1 rounded-full"
-            [ngClass]="currentTab === 'menu'
-              ? 'bg-orange-500 text-black font-semibold'
-              : 'text-gray-300'">
-            Menu
-          </span>
-        </button>
+          <button
+            class="flex-1 min-w-0 flex flex-col items-center"
+            (click)="setTab('sessions')">
+            <span
+              class="block w-full text-[11px] leading-tight px-1.5 py-1 rounded-full text-center"
+              [ngClass]="currentTab === 'sessions'
+                ? 'bg-orange-500 text-black font-semibold'
+                : 'text-gray-300'">
+              Sessions
+            </span>
+          </button>
 
-        <!-- Rifles -->
-        <button
-          class="flex-1 flex flex-col items-center"
-          (click)="setTab('rifles')">
-          <span
-            class="px-3 py-1 rounded-full"
-            [ngClass]="currentTab === 'rifles'
-              ? 'bg-orange-500 text-black font-semibold'
-              : 'text-gray-300'">
-            Rifles
-          </span>
-        </button>
+          <button
+            class="flex-1 min-w-0 flex flex-col items-center"
+            (click)="setTab('rifles')">
+            <span
+              class="block w-full text-[11px] leading-tight px-1.5 py-1 rounded-full text-center"
+              [ngClass]="currentTab === 'rifles'
+                ? 'bg-orange-500 text-black font-semibold'
+                : 'text-gray-300'">
+              Rifles
+            </span>
+          </button>
 
-        <!-- Venues -->
-        <button
-          class="flex-1 flex flex-col items-center"
-          (click)="setTab('venues')">
-          <span
-            class="px-3 py-1 rounded-full"
-            [ngClass]="currentTab === 'venues'
-              ? 'bg-orange-500 text-black font-semibold'
-              : 'text-gray-300'">
-            Venues
-          </span>
-        </button>
+          <button
+            class="flex-1 min-w-0 flex flex-col items-center"
+            (click)="setTab('venues')">
+            <span
+              class="block w-full text-[11px] leading-tight px-1.5 py-1 rounded-full text-center"
+              [ngClass]="currentTab === 'venues'
+                ? 'bg-orange-500 text-black font-semibold'
+                : 'text-gray-300'">
+              Venues
+            </span>
+          </button>
 
-        <!-- Session -->
-        <button
-          class="flex-1 flex flex-col items-center"
-          (click)="setTab('session')">
-          <span
-            class="px-3 py-1 rounded-full"
-            [ngClass]="currentTab === 'session'
-              ? 'bg-orange-500 text-black font-semibold'
-              : 'text-gray-300'">
-            Session
-          </span>
-        </button>
-
-        <!-- History -->
-        <button
-          class="flex-1 flex flex-col items-center"
-          (click)="setTab('history')">
-          <span
-            class="px-3 py-1 rounded-full"
-            [ngClass]="currentTab === 'history'
-              ? 'bg-orange-500 text-black font-semibold'
-              : 'text-gray-300'">
-            History
-          </span>
-        </button>
+          <button
+            class="flex-1 min-w-0 flex flex-col items-center"
+            (click)="setTab('history')">
+            <span
+              class="block w-full text-[11px] leading-tight px-1.5 py-1 rounded-full text-center"
+              [ngClass]="currentTab === 'history'
+                ? 'bg-orange-500 text-black font-semibold'
+                : 'text-gray-300'">
+              History
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   </div>

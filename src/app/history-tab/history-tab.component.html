@@ -54,12 +54,22 @@
   <!-- Detailed view for selected session (only this shows when open) -->
   <div *ngIf="editSession" class="bg-slate-800 rounded-xl p-3 space-y-3">
 
-    <!-- Light red notice when session is still planned -->
+    <!-- Info banner based on state -->
     <div
-      *ngIf="!editSession.completed"
-      class="mb-2 bg-rose-900/40 border border-rose-500 text-[11px] text-rose-100 rounded-lg p-2">
-      This session only has planned data. Enter your actual dope and press
-      <strong>Close</strong> when done. (Changes are kept automatically.)
+      *ngIf="isSessionEditable(editSession)"
+      class="mb-2 bg-blue-900/40 border border-blue-500 text-[11px] text-blue-100 rounded-lg p-2">
+      Session is <strong>In progress</strong>. Enter your actual DOPE here and tap
+      <strong>{{ isSessionFullyCompleted(editSession) ? 'Save &amp; mark completed' : 'Save' }}</strong>.
+    </div>
+    <div
+      *ngIf="!isSessionEditable(editSession) && !editSession.completed"
+      class="mb-2 bg-amber-900/40 border border-amber-500 text-[11px] text-amber-100 rounded-lg p-2">
+      Session is <strong>Planned</strong>. Capture/edit DOPE on the Session tab. History is read-only.
+    </div>
+    <div
+      *ngIf="editSession.completed"
+      class="mb-2 bg-emerald-900/30 border border-emerald-500 text-[11px] text-emerald-100 rounded-lg p-2">
+      Session is <strong>Completed</strong>. DOPE and notes are locked and shown as recorded.
     </div>
 
     <div class="flex justify-between items-center">
@@ -84,31 +94,47 @@
     <div class="bg-slate-900 rounded-lg p-2 space-y-1">
       <div class="text-[11px] font-semibold">Environment (recorded)</div>
       <div class="grid grid-cols-2 gap-1 text-[10px] text-slate-300">
-        <div *ngIf="editSession.environment.temperatureC != null">
+
+        <div *ngIf="editSession.environment?.temperatureC != null">
           Temp: {{ editSession.environment.temperatureC }} °C
         </div>
-        <div *ngIf="editSession.environment.pressureHpa != null">
-          Pressure: {{ editSession.environment.pressureHpa }} hPa
+
+        <!-- Pressure in inHg (prefer pressureInHg, otherwise convert from hPa) -->
+        <div *ngIf="editSession.environment">
+          <ng-container *ngIf="editSession.environment.pressureInHg != null; else hpaToInHg">
+            Pressure:
+            {{ editSession.environment.pressureInHg | number:'1.2-2' }} inHg
+          </ng-container>
+          <ng-template #hpaToInHg>
+            <div *ngIf="editSession.environment.pressureHpa != null">
+              Pressure:
+              {{
+                (editSession.environment.pressureHpa * 0.029529983071445)
+                | number:'1.2-2'
+              }} inHg
+            </div>
+          </ng-template>
         </div>
-        <div *ngIf="editSession.environment.humidityPercent != null">
+
+        <div *ngIf="editSession.environment?.humidityPercent != null">
           Humidity: {{ editSession.environment.humidityPercent }} %
         </div>
-        <div *ngIf="editSession.environment.densityAltitudeM != null">
-          DA: {{ editSession.environment.densityAltitudeM }} m
-        </div>
-        <div *ngIf="editSession.environment.windSpeedMps != null">
+
+        <div *ngIf="editSession.environment?.windSpeedMps != null">
           Wind: {{ editSession.environment.windSpeedMps }} m/s
         </div>
-        <div *ngIf="editSession.environment.windDirectionDeg != null">
-          Wind dir: {{ editSession.environment.windDirectionDeg }} °
+
+        <div *ngIf="editSession.environment?.windDirectionDeg != null">
+          Wind dir: {{ editSession.environment.windDirectionDeg }}°
         </div>
-        <div *ngIf="editSession.environment.lightConditions">
+
+        <div *ngIf="editSession.environment?.lightConditions">
           Light: {{ editSession.environment.lightConditions }}
         </div>
       </div>
     </div>
 
-    <!-- Actual dope entry – ULTRA COMPACT table layout -->
+    <!-- Actual dope entry – ULTRA COMPACT table layout WITH WIND -->
     <div class="space-y-1">
       <div class="text-[11px] font-semibold">Actual dope &amp; results</div>
 
@@ -116,74 +142,218 @@
 
         <!-- Table header -->
         <div
-          class="grid grid-cols-[60px,1fr,1fr] gap-1 pb-1 mb-1 border-b border-slate-700
+          class="grid grid-cols-[60px,1fr,1fr,1fr,1fr] gap-1 pb-1 mb-1 border-b border-slate-700
                  text-[10px] text-slate-300 font-semibold">
           <div>Dist</div>
           <div class="text-center">Elev (mil)</div>
           <div class="text-center">Wind (mil)</div>
+          <div class="text-center">W spd</div>
+          <div class="text-center">W dir</div>
         </div>
 
         <!-- Rows -->
-        <div
-          *ngFor="let row of editSession.dope; let i = index"
-          class="grid grid-cols-[60px,1fr,1fr] gap-1 text-[10px] text-slate-200
-                 pb-1 border-b border-slate-800 last:border-0">
+        <ng-container *ngIf="isSessionEditable(editSession); else readOnlyDope">
+          <!-- EDITABLE rows (In progress) -->
+          <div
+            *ngFor="let row of editSession.dope; let i = index"
+            class="grid grid-cols-[60px,1fr,1fr,1fr,1fr] gap-1 text-[10px] text-slate-200
+                   pb-1 border-b border-slate-800 last:border-0">
 
-          <!-- Distance ONLY -->
-          <div class="font-semibold leading-tight flex items-center">
-            {{ row.distanceM }} m
+            <!-- Distance -->
+            <div class="font-semibold leading-tight flex items-center">
+              {{ row.distanceM }} m
+            </div>
+
+            <!-- Elevation -->
+            <div class="flex justify-center items-center">
+              <input
+                type="number"
+                step="0.01"
+                [(ngModel)]="row.elevationMil"
+                class="w-14 text-center px-1 py-[2px] rounded bg-slate-950 border border-slate-700
+                       text-[10px] leading-tight" />
+            </div>
+
+            <!-- Windage -->
+            <div class="flex justify-center items-center">
+              <input
+                type="number"
+                step="0.01"
+                [(ngModel)]="row.windageMil"
+                class="w-14 text-center px-1 py-[2px] rounded bg-slate-950 border border-slate-700
+                       text-[10px] leading-tight" />
+            </div>
+
+            <!-- Wind SPEED -->
+            <div class="flex flex-col items-center justify-center">
+              <input
+                type="number"
+                step="0.1"
+                [(ngModel)]="row.windSpeed"
+                class="w-14 text-center px-1 py-[2px] rounded bg-slate-950 border border-slate-700
+                       text-[10px] leading-tight"
+                placeholder="m/s" />
+              <span
+                *ngIf="wasAutoFilled(row, 'windSpeed')"
+                class="text-[8px] text-emerald-400 leading-tight mt-[1px]">
+                auto
+              </span>
+            </div>
+
+            <!-- Wind DIRECTION + arrow (clock-based) -->
+            <div class="flex flex-col items-center justify-center">
+              <input
+                type="text"
+                [(ngModel)]="row.windDirection"
+                class="w-14 text-center px-1 py-[2px] rounded bg-slate-950 border border-slate-700
+                       text-[10px] leading-tight"
+                placeholder="clock (1–12)" />
+              <span class="text-[10px] leading-tight mt-[1px]">
+                {{ getWindArrow(row) }}
+              </span>
+            </div>
+
+            <!-- Notes – full width, editable -->
+            <div class="col-span-5 mt-1">
+              <textarea
+                rows="1"
+                [(ngModel)]="row.impactsDescription"
+                class="w-full px-1 py-1 rounded bg-slate-950 border border-slate-700
+                       text-[9px] leading-tight"
+                placeholder="Notes (optional)"></textarea>
+            </div>
+
           </div>
+        </ng-container>
 
-          <!-- Elevation – very compact box -->
-          <div class="flex justify-center items-center">
-            <input
-              type="number"
-              step="0.01"
-              [(ngModel)]="row.elevationMil"
-              class="w-16 text-center px-1 py-[2px] rounded bg-slate-950 border border-slate-700
-                     text-[10px] leading-tight" />
+        <!-- READ-ONLY rows (Planned or Completed) -->
+        <ng-template #readOnlyDope>
+          <div
+            *ngFor="let row of editSession.dope; let i = index"
+            class="grid grid-cols-[60px,1fr,1fr,1fr,1fr] gap-1 text-[10px] text-slate-200
+                   pb-1 border-b border-slate-800 last:border-0">
+
+            <!-- Distance -->
+            <div class="font-semibold leading-tight flex items-center">
+              {{ row.distanceM }} m
+            </div>
+
+            <!-- Elevation -->
+            <div class="flex justify-center items-center">
+              <span
+                class="min-w-[2.8rem] px-1 py-[1px] rounded bg-slate-950 border border-slate-700
+                       text-[10px] leading-tight text-center">
+                {{ row.elevationMil != null ? (row.elevationMil | number:'1.2-2') : '–' }}
+              </span>
+            </div>
+
+            <!-- Windage -->
+            <div class="flex justify-center items-center">
+              <span
+                class="min-w-[2.8rem] px-1 py-[1px] rounded bg-slate-950 border border-slate-700
+                       text-[10px] leading-tight text-center">
+                {{ row.windageMil != null ? (row.windageMil | number:'1.2-2') : '–' }}
+              </span>
+            </div>
+
+            <!-- Wind SPEED -->
+            <div class="flex flex-col items-center justify-center">
+              <span
+                class="min-w-[2.8rem] px-1 py-[1px] rounded bg-slate-950 border border-slate-700
+                       text-[10px] leading-tight text-center">
+                {{ row.windSpeed != null ? (row.windSpeed | number:'1.1-1') : '–' }}
+              </span>
+              <span
+                *ngIf="wasAutoFilled(row, 'windSpeed')"
+                class="text-[8px] text-emerald-400 leading-tight mt-[1px]">
+                auto
+              </span>
+            </div>
+
+            <!-- Wind DIRECTION + arrow -->
+            <div class="flex flex-col items-center justify-center">
+              <span
+                class="min-w-[2.8rem] px-1 py-[1px] rounded bg-slate-950 border border-slate-700
+                       text-[10px] leading-tight text-center">
+                {{ row.windDirection != null ? row.windDirection : '–' }}
+              </span>
+              <span class="text-[10px] leading-tight mt-[1px]">
+                {{ getWindArrow(row) }}
+              </span>
+            </div>
+
+            <!-- Notes – full width, read-only -->
+            <div class="col-span-5 mt-1 text-[9px] leading-tight text-slate-200">
+              <ng-container *ngIf="row.impactsDescription && row.impactsDescription.trim().length > 0; else noNote">
+                {{ row.impactsDescription }}
+              </ng-container>
+              <ng-template #noNote>
+                <span class="text-slate-500 italic">No notes</span>
+              </ng-template>
+            </div>
+
           </div>
-
-          <!-- Windage – very compact box -->
-          <div class="flex justify-center items-center">
-            <input
-              type="number"
-              step="0.01"
-              [(ngModel)]="row.windageMil"
-              class="w-16 text-center px-1 py-[2px] rounded bg-slate-950 border border-slate-700
-                     text-[10px] leading-tight" />
-          </div>
-
-          <!-- Notes – full width, ultra compact -->
-          <div class="col-span-3 mt-1">
-            <textarea
-              rows="1"
-              [(ngModel)]="row.impactsDescription"
-              class="w-full px-1 py-1 rounded bg-slate-950 border border-slate-700
-                     text-[9px] leading-tight"
-              placeholder="Notes (optional)"></textarea>
-          </div>
-
-        </div>
+        </ng-template>
       </div>
     </div>
 
     <!-- Session notes -->
-    <label class="flex flex-col mt-2">
-      Session notes
+    <div class="mt-2">
+      <div class="text-[11px] font-semibold mb-1">Session notes</div>
+
+      <!-- Editable notes when in progress -->
       <textarea
+        *ngIf="isSessionEditable(editSession); else readOnlyNotes"
         [(ngModel)]="editSession.notes"
         rows="3"
-        class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700"></textarea>
-    </label>
+        class="mt-1 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-[10px]"></textarea>
 
-    <!-- Close button (replaces Save, hides details & returns to list) -->
-    <div class="mt-3">
+      <!-- Read-only notes -->
+      <ng-template #readOnlyNotes>
+        <div class="bg-slate-900 rounded-lg p-2 text-[10px] text-slate-200 min-h-[2rem]">
+          <ng-container *ngIf="editSession.notes && editSession.notes.trim().length > 0; else noSessNote">
+            {{ editSession.notes }}
+          </ng-container>
+          <ng-template #noSessNote>
+            <span class="text-slate-500 italic">No session notes</span>
+          </ng-template>
+        </div>
+      </ng-template>
+    </div>
+
+    <!-- Validation error -->
+    <div *ngIf="validationError" class="mt-2 text-[10px] text-rose-400">
+      {{ validationError }}
+    </div>
+
+    <!-- Footer buttons + toast -->
+    <div class="mt-3 space-y-1">
+      <!-- Editable: primary save button (in-progress or complete) -->
       <button
-        class="w-full px-3 py-2 rounded-xl bg-orange-500 text-black text-sm font-semibold"
-        (click)="editSession = null">
-        Close
+        *ngIf="isSessionEditable(editSession); else closeOnlyBtn"
+        class="w-full px-3 py-2 rounded-xl text-black text-sm font-semibold"
+        [ngClass]="isSessionFullyCompleted(editSession)
+          ? 'bg-emerald-500'
+          : 'bg-emerald-600'"
+        (click)="onPrimarySaveClick()">
+        {{ isSessionFullyCompleted(editSession) ? 'Save &amp; mark completed' : 'Save' }}
       </button>
+
+      <!-- Read-only: Close only -->
+      <ng-template #closeOnlyBtn>
+        <button
+          class="w-full px-3 py-2 rounded-xl bg-orange-500 text-black text-sm font-semibold"
+          (click)="closeEdit()">
+          Close
+        </button>
+      </ng-template>
+
+      <!-- Small toast under button -->
+      <div
+        *ngIf="saveMessage"
+        class="text-[10px] text-emerald-300 text-center">
+        {{ saveMessage }}
+      </div>
     </div>
   </div>
 

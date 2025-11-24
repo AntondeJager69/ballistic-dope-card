@@ -2,16 +2,33 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-// Child tabs (standalone components)
 import { RiflesTabComponent } from './rifles-tab/rifles-tab.component';
 import { VenuesTabComponent } from './venues-tab/venues-tab.component';
 import { SessionTabComponent } from './session-tab/session-tab.component';
 import { HistoryTabComponent } from './history-tab/history-tab.component';
 import { LoadDevTabComponent } from './load-dev-tab/load-dev-tab.component';
+import { WindEffectToolComponent } from './wind-effect-tool.component';
+
+import { DataService } from './data.service';
 import { BleClient } from '@capacitor-community/bluetooth-le';
 
-// Data / storage service
-import { DataService } from './data.service';
+interface KestrelQuickSnapshot {
+  temperatureC: number | null;
+  pressureInHg: number | null;
+  humidityPercent: number | null;
+  windSpeedMps: number | null;
+  windDirectionClock: number | null;
+  densityAltitudeM: number | null;
+}
+
+interface ReportRequest {
+  type: 'recent' | 'rifle' | 'venue' | 'dateRange';
+  rifleId: string | null;
+  venueId: string | null;
+  dateFrom: string | null;
+  dateTo: string | null;
+  limit: number;
+}
 
 @Component({
   selector: 'app-root',
@@ -26,37 +43,23 @@ import { DataService } from './data.service';
     SessionTabComponent,
     HistoryTabComponent,
     LoadDevTabComponent,
+    WindEffectToolComponent,
   ],
 })
 export class AppComponent implements OnInit {
-  // ---------------------------------------------------------------------------
-  // App meta + tab state
-  // ---------------------------------------------------------------------------
-  currentTab: 'menu' | 'sessions' | 'rifles' | 'venues' | 'history' | 'loadDev' = 'menu';
-
-  appTitle = 'Gunstuff Ballistics';
-  appSubtitle = 'Precision • Robust • Timeless';
+  appTitle = 'Gunstuff Ballistic Dope Card';
+  appSubtitle = 'Field log for rifles, venues & sessions';
   appVersion = '1.0.0';
 
-  // ---------------------------------------------------------------------------
-  // Menu: reports + tools visibility
-  // ---------------------------------------------------------------------------
+  currentTab: 'menu' | 'sessions' | 'rifles' | 'venues' | 'history' | 'loadDev' = 'menu';
+
+  activeRifleName: string | null = null;
+  activeVenueName: string | null = null;
+  recentSessionsCount = 0;
+  recentLoadDevCount = 0;
+
   showReportsForm = false;
-  showTools = false;
-
-  selectedTool: 'kestrel' | 'converter' | 'windEffect' | null = null;
-
-  // ---------------------------------------------------------------------------
-  // Reports panel state (used in app.component.html)
-  // ---------------------------------------------------------------------------
-  reportRequest: {
-    type: 'recent' | 'rifle' | 'venue' | 'dateRange';
-    rifleId: number | null;
-    venueId: number | null;
-    dateFrom: string | null;
-    dateTo: string | null;
-    limit: number;
-  } = {
+  reportRequest: ReportRequest = {
     type: 'recent',
     rifleId: null,
     venueId: null,
@@ -68,54 +71,50 @@ export class AppComponent implements OnInit {
   riflesOptions: any[] = [];
   venuesOptions: any[] = [];
 
-  // ---------------------------------------------------------------------------
-  // Kestrel quick env display
-  // ---------------------------------------------------------------------------
+  showTools = false;
+  selectedTool: 'kestrel' | 'converter' | 'windEffect' | null = null;
+
   kestrelIsConnecting = false;
+  kestrelStatus = 'Tap Kestrel to read environment';
   kestrelError: string | null = null;
-  kestrelData: any = null;
-  kestrelStatus = '';
+  kestrelData: KestrelQuickSnapshot | null = null;
   kestrelLastUpdated: Date | null = null;
 
-  // ---------------------------------------------------------------------------
-  // Mil / MOA converter
-  // ---------------------------------------------------------------------------
   converterMode: 'milToMoa' | 'moaToMil' = 'milToMoa';
   converterInput: number | null = null;
 
   constructor(private dataService: DataService) {}
 
-  // ---------------------------------------------------------------------------
-  // Lifecycle
-  // ---------------------------------------------------------------------------
   ngOnInit(): void {
-    // Populate riflesOptions / venuesOptions for the reports dropdowns
-    try {
-      if (typeof this.dataService.getRifles === 'function') {
-        this.riflesOptions = this.dataService.getRifles() || [];
-      }
-    } catch (err) {
-      console.error('Error loading rifles in AppComponent:', err);
-      this.riflesOptions = [];
-    }
+    this.loadCoreData();
+  }
 
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private loadCoreData(): void {
     try {
-      if (typeof this.dataService.getVenues === 'function') {
-        this.venuesOptions = this.dataService.getVenues() || [];
-      }
+      const rifles = this.dataService.getRifles();
+      const venues = this.dataService.getVenues();
+      const sessions = this.dataService.getSessions?.() ?? [];
+
+      this.riflesOptions = rifles || [];
+      this.venuesOptions = venues || [];
+
+      this.recentSessionsCount = sessions.length;
+      this.recentLoadDevCount = 0;
+
+      this.activeRifleName = rifles?.length ? rifles[0].name : null;
+      this.activeVenueName = venues?.length ? venues[0].name : null;
     } catch (err) {
-      console.error('Error loading venues in AppComponent:', err);
-      this.venuesOptions = [];
+      console.error('Error loading core data in AppComponent:', err);
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Tab navigation
-  // ---------------------------------------------------------------------------
   setTab(tab: 'menu' | 'sessions' | 'rifles' | 'venues' | 'history' | 'loadDev'): void {
     this.currentTab = tab;
 
-    // Reset menu-related UI when leaving/entering
     if (tab !== 'menu') {
       this.showReportsForm = false;
       this.showTools = false;
@@ -127,32 +126,20 @@ export class AppComponent implements OnInit {
     this.setTab('sessions');
   }
 
-  // ---------------------------------------------------------------------------
-  // Reports
-  // ---------------------------------------------------------------------------
   toggleReportsForm(): void {
     this.showReportsForm = !this.showReportsForm;
   }
 
   submitReportRequest(): void {
-    // You can wire this up to real logic later; for now, just close the panel.
     console.log('Report request:', this.reportRequest);
     this.showReportsForm = false;
   }
 
-  // ---------------------------------------------------------------------------
-  // Tools & utilities
-  // ---------------------------------------------------------------------------
   openTools(): void {
     this.showTools = !this.showTools;
-
     if (!this.showTools) {
       this.selectedTool = null;
     }
-  }
-
-  onKestrelToolClick(): void {
-    this.selectedTool = this.selectedTool === 'kestrel' ? null : 'kestrel';
   }
 
   onConverterToolClick(): void {
@@ -160,26 +147,135 @@ export class AppComponent implements OnInit {
   }
 
   onWindEffectToolClick(): void {
-    // Wind effect tool component is temporarily removed from HTML;
-    // we still toggle the state so the UI text ("Tap to open/close") behaves correctly.
     this.selectedTool = this.selectedTool === 'windEffect' ? null : 'windEffect';
   }
 
-  // ---------------------------------------------------------------------------
-  // Converter derived output (used as getter in the template)
-  // ---------------------------------------------------------------------------
   get converterOutput(): number | null {
     if (this.converterInput == null || Number.isNaN(this.converterInput)) {
       return null;
     }
-
     const value = this.converterInput;
+    return this.converterMode === 'milToMoa'
+      ? Math.round(value * 3.43775 * 100) / 100
+      : Math.round((value / 3.43775) * 1000) / 1000;
+  }
 
-    if (this.converterMode === 'milToMoa') {
-      // 1 mil ≈ 3.43775 MOA
-      return Math.round(value * 3.43775 * 100) / 100;
-    } else {
-      return Math.round((value / 3.43775) * 1000) / 1000;
+  async onKestrelToolClick(): Promise<void> {
+    if (this.selectedTool === 'kestrel') {
+      this.selectedTool = null;
+      return;
+    }
+
+    this.selectedTool = 'kestrel';
+    this.kestrelError = null;
+    this.kestrelStatus = 'Scanning for Kestrel…';
+    this.kestrelIsConnecting = true;
+
+    const kestrelServiceUuid = '03290000-eab4-dea1-b24e-44ec023874db';
+    const sensorMeasurementsUuid = '03290310-eab4-dea1-b24e-44ec023874db';
+
+    try {
+      await BleClient.initialize({ androidNeverForLocation: true });
+
+      const enabled = await BleClient.isEnabled().catch(() => true);
+      if (!enabled) {
+        this.kestrelStatus = 'Bluetooth is off – asking to enable…';
+        await BleClient.requestEnable();
+      }
+
+      let foundDevice: any = null;
+
+      this.kestrelStatus = 'Scanning for Kestrel (up to 8s)…';
+      await BleClient.requestLEScan(
+        {} as any,
+        (result) => {
+          const dev = result.device;
+          const name = (dev?.name || '').trim();
+
+          if (!foundDevice && name) {
+            const lower = name.toLowerCase();
+            const looksLikeKestrel =
+              lower.startsWith('elite') ||
+              lower.startsWith('kestrel') ||
+              lower.includes('570') ||
+              lower.includes('550');
+
+            if (looksLikeKestrel) {
+              foundDevice = dev;
+            }
+          }
+        }
+      );
+
+      await this.sleep(8000);
+      await BleClient.stopLEScan().catch(() => undefined);
+
+      if (!foundDevice) {
+        this.kestrelError = 'No Kestrel-like device found.';
+        this.kestrelStatus = 'No Kestrel found – ensure it is on & broadcasting.';
+        return;
+      }
+
+      this.kestrelStatus = `Connecting to ${foundDevice.name || 'Kestrel'}…`;
+
+      await BleClient.connect(foundDevice.deviceId, () => {
+        console.log('[Tools] Kestrel disconnected');
+      });
+
+      const services = await BleClient.getServices(foundDevice.deviceId);
+      const hasService = services.some((svc: any) => {
+        const uuid = (svc.uuid || '').toLowerCase();
+        return uuid === kestrelServiceUuid;
+      });
+
+      if (!hasService) {
+        throw new Error('Kestrel service not found on device');
+      }
+
+      this.kestrelStatus = 'Reading sensor measurements…';
+
+      const raw = await BleClient.read(
+        foundDevice.deviceId,
+        kestrelServiceUuid,
+        sensorMeasurementsUuid
+      );
+
+      const dataView = new DataView(raw.buffer);
+
+      const getInt16 = (offset: number) => dataView.getInt16(offset, true);
+      const getUint16 = (offset: number) => dataView.getUint16(offset, true);
+
+      const tempRaw = getInt16(0);
+      const rhRaw = getUint16(2);
+      const pressureRaw = getUint16(4);
+      const daRaw = getInt16(6);
+      const windSpeedRaw = getUint16(8);
+      const windDirRaw = getUint16(10);
+
+      const temperatureC = tempRaw / 100;
+      const humidityPercent = rhRaw / 100;
+      const pressureInHg = pressureRaw / 1000;
+      const densityAltitudeM = daRaw;
+      const windSpeedMps = windSpeedRaw / 100;
+      const windDirectionClock = Math.round(((windDirRaw / 360.0) * 12) || 0);
+
+      this.kestrelData = {
+        temperatureC,
+        humidityPercent,
+        pressureInHg,
+        densityAltitudeM,
+        windSpeedMps,
+        windDirectionClock,
+      };
+
+      this.kestrelLastUpdated = new Date();
+      this.kestrelStatus = 'Kestrel data updated.';
+    } catch (err: any) {
+      console.error('[Tools] Kestrel Bluetooth error:', err);
+      this.kestrelError = err?.message || String(err);
+      this.kestrelStatus = 'Kestrel read failed – see console for details.';
+    } finally {
+      this.kestrelIsConnecting = false;
     }
   }
 }

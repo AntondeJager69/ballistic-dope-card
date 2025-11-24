@@ -47,11 +47,10 @@
               <span class="w-10"></span>
             </div>
 
-            <!-- REPLACED WIND TOOL -->
-            <div class="flex-1 flex items-center justify-center text-gray-400 text-[11px]">
-              Wind effect tool not installed
+            <!-- Full-height wind effect tool -->
+            <div class="flex-1 flex items-center justify-center">
+              <app-wind-effect-tool></app-wind-effect-tool>
             </div>
-
           </div>
         </ng-container>
 
@@ -177,18 +176,23 @@
                       'bg-green-600 hover:scale-105': !kestrelIsConnecting && kestrelData && !kestrelError,
                       'bg-red-600': kestrelError
                     }"
-                      (click)="onKestrelToolClick(); connectKestrelBluetooth()"
-
+                    (click)="onKestrelToolClick()"
                     [disabled]="kestrelIsConnecting">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                         viewBox="0 0 24 24"
-                         class="w-6 h-6">
+
+                    <!-- Simple "Kestrel" SVG icon -->
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      class="w-6 h-6">
                       <circle cx="12" cy="12" r="9" class="fill-black/40" />
-                      <path class="fill-white"
-                            d="M12 4.5c.6 0 1 .4 1 1v4.1l3.1-1.8a1 1 0 0 1 1 1.7l-3.1 1.8 3.1 1.8a1 1 0 0 1-1 1.7L13 13.3v4.2a1 1 0 0 1-2 0v-4.2l-3.1 1.8a1 1 0 1 1-1-1.7l3.1-1.8-3.1-1.8a1 1 0 0 1 1-1.7L11 9.6V5.5c0-.6.4-1 1-1Z" />
+                      <path
+                        class="fill-white"
+                        d="M12 4.5c.6 0 1 .4 1 1v4.1l3.1-1.8a1 1 0 0 1 1 1.7l-3.1 1.8 3.1 1.8a1 1 0 0 1-1 1.7L13 13.3v4.2a1 1 0 0 1-2 0v-4.2l-3.1 1.8a1 1 0 1 1-1-1.7l3.1-1.8-3.1-1.8a1 1 0 0 1 1-1.7L11 9.6V5.5c0-.6.4-1 1-1Z" />
                     </svg>
                   </button>
-                  <span class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
+
+                  <span
+                    class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
                     Kestrel env
                   </span>
                   <span class="text-[9px] text-gray-500 italic mt-0.5">
@@ -196,14 +200,16 @@
                   </span>
                 </div>
 
-                <!-- Converter -->
+                <!-- Mil / MOA converter icon -->
                 <div class="flex flex-col items-center">
                   <button
                     class="w-12 h-12 rounded-full bg-black flex items-center justify-center shadow-lg border border-gray-600"
                     (click)="onConverterToolClick()">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                         viewBox="0 0 24 24"
-                         class="w-6 h-6">
+                    <!-- Simple crosshair / dial icon -->
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      class="w-6 h-6">
                       <circle cx="12" cy="12" r="7" class="fill-transparent stroke-white" stroke-width="1" />
                       <line x1="12" y1="3" x2="12" y2="7" class="stroke-white" stroke-width="1" />
                       <line x1="12" y1="17" x2="12" y2="21" class="stroke-white" stroke-width="1" />
@@ -212,7 +218,8 @@
                       <circle cx="12" cy="12" r="1.4" class="fill-white" />
                     </svg>
                   </button>
-                  <span class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
+                  <span
+                    class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
                     Mil ↔ MOA
                   </span>
                   <span class="text-[9px] text-gray-500 italic mt-0.5">
@@ -343,9 +350,9 @@
                 </div>
               </div>
 
-              <!-- WIND TOOL PANEL (REMOVED) -->
-              <div *ngIf="selectedTool === 'windEffect'" class="mt-2 bg-black/40 rounded-2xl p-2.5 space-y-2 text-[11px] text-gray-400">
-                Wind effect tool not installed
+              <!-- WIND TOOL PANEL -->
+              <div *ngIf="selectedTool === 'windEffect'" class="mt-2 bg-black/40 rounded-2xl p-2.5 space-y-2 text-[11px]">
+                <app-wind-effect-tool></app-wind-effect-tool>
               </div>
 
             </div>

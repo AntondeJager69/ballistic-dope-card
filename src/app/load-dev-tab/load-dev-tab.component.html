@@ -23,7 +23,7 @@
 
     <div class="flex justify-between items-center mt-1">
       <span class="text-[11px] text-gray-300">
-        Projects for rifle:
+        Load tests for rifle:
         <ng-container *ngIf="selectedRifleId; else noRifle">
           {{ projects.length }}
         </ng-container>
@@ -33,28 +33,32 @@
         class="px-3 py-1 text-[11px] rounded bg-orange-500 text-black font-semibold"
         (click)="newProject()"
         [disabled]="!selectedRifleId">
-        New project
+        New load test
       </button>
     </div>
   </div>
 
   <!-- Projects list -->
   <div class="bg-gray-900 rounded-xl p-3 shadow space-y-2">
-    <h3 class="text-xs font-semibold mb-1">Projects</h3>
+    <h3 class="text-xs font-semibold mb-1">Load tests</h3>
 
     <div *ngIf="!selectedRifleId" class="text-[11px] text-gray-400">
       Select a rifle above to see its load development projects.
     </div>
 
     <div *ngIf="selectedRifleId && projects.length === 0" class="text-[11px] text-gray-400">
-      No projects yet. Tap <strong>New project</strong> to start a ladder, OCW or group comparison.
+      No projects yet. Tap <strong>New load test</strong> to start a ladder, OCW or group comparison.
     </div>
 
     <!-- PROJECT ITEM – ONE LINE + SMALL HORIZONTAL BUTTONS -->
     <div
       *ngFor="let p of projects"
-      class="bg-black rounded-lg p-2 mt-1 flex justify-between items-center border"
-      [ngClass]="p.id === selectedProjectId ? 'border-orange-500' : 'border-gray-700'">
+      class="bg-black rounded-lg p-2 mt-1 flex justify-between items-center border transition-colors"
+      [ngClass]="{
+        'border-orange-500': p.id === selectedProjectId,
+        'border-yellow-400 bg-yellow-900/40': isAwaitingData(p) && p.id !== selectedProjectId,
+        'border-gray-700': !isAwaitingData(p) && p.id !== selectedProjectId
+      }">
 
       <!-- LEFT: one-line compact info -->
       <div class="text-[11px] text-gray-200 overflow-hidden whitespace-nowrap overflow-ellipsis">
@@ -62,6 +66,9 @@
         • {{ projectTypeLabel(p.type) }}
         • {{ asDateString(p.dateStarted) }}
         • {{ p.entries.length }} {{ p.entries.length === 1 ? 'entry' : 'entries' }}
+        <span *ngIf="isAwaitingData(p)" class="ml-1 px-1.5 py-0.5 rounded bg-yellow-400 text-black">
+          Awaiting data
+        </span>
       </div>
 
       <!-- RIGHT: horizontal small buttons -->
@@ -78,7 +85,7 @@
   <div *ngIf="projectFormVisible" class="bg-gray-900 rounded-xl p-2 shadow space-y-2">
     <div class="flex justify-between items-center mb-1">
       <h3 class="text-xs font-semibold">
-        {{ editingProject ? 'Edit project' : 'New project' }}
+        {{ editingProject ? 'Edit load test' : 'New load test' }}
       </h3>
     </div>
 
@@ -112,11 +119,11 @@
 
     <!-- Project name -->
     <label class="flex flex-col mt-1">
-      <span class="mb-0.5">Project name</span>
+      <span class="mb-0.5">Load test name</span>
       <input
         [(ngModel)]="projectForm.name"
         name="projectName"
-        placeholder="e.g. N570 OCW December"
+        placeholder="e.g. 6.5 CM N570 OCW December"
         class="px-2 py-1 rounded bg-black border border-gray-700 text-[11px]" />
     </label>
 
@@ -182,15 +189,30 @@
       </ul>
     </div>
 
-    <!-- RESULTS PANEL (collapsible via <details>) -->
+    <div *ngIf="selectedProject.type === 'groups'"
+      class="text-[10px] text-gray-200 bg-black/70 border border-gray-700 rounded p-2 space-y-1">
+      <div class="font-semibold text-orange-300">Group comparison</div>
+      <ul class="list-inside list-disc space-y-0.5">
+        <li>Multiple loads shot in groups.</li>
+        <li>Compare group size and consistency between charges.</li>
+        <li>SD/ES and group shape help choose the final load.</li>
+      </ul>
+    </div>
+
+    <!-- RESULTS / PLAN PANEL (collapsible) -->
     <details class="mt-1 rounded-xl bg-black/80 border border-gray-700" open>
       <summary class="flex justify-between items-center px-2 py-1 text-[11px] cursor-pointer">
         <div class="flex flex-col sm:flex-row sm:items-center gap-0.5 text-left">
           <span class="font-semibold text-gray-100">
-            Current {{ projectTypeLabel(selectedProject.type) }} results
+            {{ hasResultsForSelectedProject
+               ? 'Current ' + projectTypeLabel(selectedProject.type) + ' results'
+               : 'Planned ' + projectTypeLabel(selectedProject.type) + ' series (awaiting data)' }}
           </span>
           <span class="text-[10px] text-gray-300 sm:ml-2">
             Entries: {{ selectedProject.entries.length }}
+          </span>
+          <span *ngIf="!hasResultsForSelectedProject" class="text-[9px] text-yellow-300 sm:ml-2">
+            Go shoot this planned series, then come back and enter your data.
           </span>
           <span
             *ngIf="selectedProject.entries.length > 0"
@@ -372,7 +394,12 @@
         </div>
 
         <div class="flex justify-between items-center mt-1 text-[10px] text-gray-300">
-          <span>Creates one entry per charge step.</span>
+          <span class="text-left">
+            <span class="block">Creates one planned load per charge step.</span>
+            <span class="block text-[9px] text-yellow-300 mt-0.5">
+              After generating, this series will be highlighted in yellow under Load tests – go shoot it and then come back to enter your data.
+            </span>
+          </span>
           <button
             class="px-3 py-1 text-[10px] rounded bg-orange-500 text-black font-semibold"
             (click)="generateSeriesFromPlanner()">
@@ -428,7 +455,7 @@
           class="mt-1 px-2 py-1 rounded bg-black border border-gray-700" />
       </label>
 
-      <!-- ✅ New BC field -->
+      <!-- ✅ BC field -->
       <label class="flex flex-col">BC (G7)
         <input [(ngModel)]="entryForm.bulletBc"
           placeholder="e.g. 0.345"

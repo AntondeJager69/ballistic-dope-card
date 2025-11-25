@@ -9,62 +9,47 @@
 
   <!-- PENDING SESSIONS – always at top, outside History block -->
   <div
-    *ngIf="pendingSessions.length > 0 && !editSession"
-    class="bg-amber-900/40 border border-amber-500 rounded-xl p-3 space-y-2">
+  *ngFor="let s of pendingSessions"
+  class="bg-slate-950 rounded-lg p-2 border border-amber-400 space-y-1">
 
-    <div class="flex items-center justify-between">
-      <h2 class="text-sm font-semibold">Needs DOPE capture</h2>
-      <span class="text-[10px] text-amber-100">
-        {{ pendingSessions.length }} session{{ pendingSessions.length !== 1 ? 's' : '' }}
+  <!-- Top row: title + status + button all in one line -->
+  <div class="flex items-center justify-between gap-2">
+    <div class="flex items-center gap-2 min-w-0">
+      <div class="text-[11px] font-semibold truncate">
+        {{ s.title || 'Untitled session' }}
+      </div>
+      <span
+        class="px-2 py-[2px] rounded-full text-[10px] font-semibold"
+        [ngClass]="getStatusClass(s)">
+        {{ getStatusLabel(s) }}
       </span>
     </div>
 
-    <!-- HINT -->
-    <p class="text-[10px] text-amber-100 mt-1">
-      Enter your actual DOPE from the shoot. Once all fields are filled, tap
-      <strong>Save &amp; mark completed</strong> to store the session with the rest of your history.
-    </p>
-
-    <div
-      *ngFor="let s of pendingSessions"
-      class="bg-slate-950 rounded-lg p-2 flex items-center justify-between gap-2 border border-amber-400">
-
-      <div class="flex-1">
-        <div class="flex items-center gap-2">
-          <div class="text-[11px] font-semibold">
-            {{ s.title || 'Untitled session' }}
-          </div>
-          <span
-            class="px-2 py-[2px] rounded-full text-[10px] font-semibold"
-            [ngClass]="getStatusClass(s)">
-            {{ getStatusLabel(s) }}
-          </span>
-        </div>
-        <div class="text-[10px] text-slate-300">
-          {{ s.date | date: 'yyyy-MM-dd HH:mm' }} •
-          {{ getRifleName(s.rifleId) }} @
-          {{ getVenueName(s.venueId) }}
-        </div>
-        <div *ngIf="s.notes" class="text-[9px] text-slate-400 line-clamp-1">
-          {{ s.notes }}
-        </div>
-      </div>
-
-      <div class="flex flex-col gap-1 text-[11px]">
-        <button
-          class="px-2 py-1 rounded bg-amber-500 text-slate-900 font-semibold"
-          (click)="selectSession(s)">
-          Edit now
-        </button>
-      </div>
-
-    </div>
+    <button
+      class="px-2 py-1 rounded bg-amber-500 text-slate-900 font-semibold text-[11px] whitespace-nowrap"
+      (click)="selectSession(s)">
+      Input Shot Data
+    </button>
   </div>
+
+  <!-- Second line: meta info -->
+  <div class="text-[10px] text-slate-300">
+    {{ s.date | date: 'yyyy-MM-dd HH:mm' }} •
+    {{ getRifleName(s.rifleId) }} @
+    {{ getVenueName(s.venueId) }}
+  </div>
+
+  <!-- Optional notes -->
+  <div *ngIf="s.notes" class="text-[9px] text-slate-400 line-clamp-1">
+    {{ s.notes }}
+  </div>
+</div>
 
   <!-- Venue overview (HIDDEN when a session is opened) -->
   <div
     *ngIf="sessions.length > 0 && !editSession"
-    class="bg-slate-800 rounded-xl p-3 space-y-3">
+    class="bg-slate-800 rounded-xl p-3 space-y-3 flex-1">
+
 
     <!-- Header + count -->
     <div class="flex items-center justify-between gap-2">
@@ -89,11 +74,13 @@
       </button>
     </div>
 
-    <!-- Venue groups -->
-    <div class="space-y-2 max-h-[360px] overflow-y-auto pr-1">
-      <div
-        *ngFor="let group of venueGroups"
-        class="bg-slate-900 rounded-xl p-2 space-y-1">
+  <!-- Venue groups -->
+<div class="space-y-2">
+  <div
+    *ngFor="let group of venueGroups"
+    class="bg-slate-900 rounded-xl p-2 space-y-1">
+    ...
+
 
         <!-- Venue header -->
         <button

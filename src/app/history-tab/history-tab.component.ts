@@ -211,18 +211,19 @@ export class HistoryTabComponent implements OnInit {
 
     const idx = this.sessions.findIndex(sess => sess.id === s.id);
     if (idx >= 0) {
+      // Update local list
       this.sessions.splice(idx, 1);
+
+      // Persist via DataService
       try {
         const ds: any = this.dataService;
-        if (ds && typeof ds.saveSessions === 'function') {
-          ds.saveSessions(this.sessions);
+        if (ds && typeof ds.deleteSession === 'function') {
+          ds.deleteSession(s.id);
         }
       } catch (err) {
-        console.error('Error saving sessions after delete:', err);
+        console.error('Error deleting session from DataService:', err);
       }
     }
-
-    this.rebuildPendingSessions();
 
     if (this.selectedSessionId === s.id) {
       this.selectedSessionId = null;
@@ -462,11 +463,14 @@ export class HistoryTabComponent implements OnInit {
     }
   }
 
-  private persistSessions(): void {
+   private persistSessions(): void {
     try {
       const ds: any = this.dataService;
-      if (ds && typeof ds.saveSessions === 'function') {
-        ds.saveSessions(this.sessions);
+      // DataService has updateSession(), not saveSessions().
+      if (ds && typeof ds.updateSession === 'function') {
+        for (const s of this.sessions) {
+          ds.updateSession(s);
+        }
       }
     } catch (err) {
       console.error('Error persisting sessions from HistoryTab:', err);

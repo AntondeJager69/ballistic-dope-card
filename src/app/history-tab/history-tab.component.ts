@@ -11,6 +11,9 @@ import { DataService } from '../data.service';
 })
 export class HistoryTabComponent implements OnInit {
   sessions: any[] = [];
+  // NEW: highlighted sessions that still need DOPE capture
+  pendingSessions: any[] = [];
+
   selectedSessionId: string | null = null;
   editSession: any | null = null;
   validationError: string | null = null;
@@ -19,6 +22,7 @@ export class HistoryTabComponent implements OnInit {
 
   searchTerm: string = '';
   expandedVenueId: number | null = null;
+
   constructor(private dataService: DataService) {}
 
   ngOnInit(): void {
@@ -40,6 +44,8 @@ export class HistoryTabComponent implements OnInit {
       console.error('Error loading sessions in HistoryTab:', err);
       this.sessions = [];
     }
+
+    this.rebuildPendingSessions();
   }
 
   // --------------------------------------------------
@@ -90,16 +96,22 @@ export class HistoryTabComponent implements OnInit {
       return 'Unknown venue';
     }
   }
-  
+
   // --------------------------------------------------
   // Search & grouping for venue-based history view
   // --------------------------------------------------
   get filteredSessions(): any[] {
+    // Normal History block shows only non-editable sessions.
+    const base = (this.sessions || []).filter(
+      (s: any) => !this.isSessionEditable(s)
+    );
+
     const term = this.searchTerm?.trim().toLowerCase();
     if (!term) {
-      return this.sessions || [];
+      return base;
     }
-    return (this.sessions || []).filter((s: any) => {
+
+    return base.filter((s: any) => {
       const venueName = (this.getVenueName(s.venueId) || '').toLowerCase();
       const rifleName = (this.getRifleName(s.rifleId) || '').toLowerCase();
       const title = (s.title || '').toLowerCase();
@@ -112,9 +124,10 @@ export class HistoryTabComponent implements OnInit {
       );
     });
   }
-  
+
   get venueGroups(): { venueId: number | null; venueName: string; sessions: any[] }[] {
     const map = new Map<number | null, { venueId: number | null; venueName: string; sessions: any[] }>();
+
     for (const s of this.filteredSessions) {
       const vid = (s.venueId ?? null) as number | null;
       const vname = this.getVenueName(s.venueId) || 'Unknown venue';
@@ -125,29 +138,44 @@ export class HistoryTabComponent implements OnInit {
       }
       group.sessions.push(s);
     }
+
     const groups = Array.from(map.values());
-    // sort sessions in each group by date (oldest first)
+
+    // sort sessions in each group by date (oldest → newest)
     for (const g of groups) {
       g.sessions.sort((a, b) => this.getSessionTime(a) - this.getSessionTime(b));
     }
+
     // sort venues alphabetically
     groups.sort((a, b) => a.venueName.localeCompare(b.venueName));
     return groups;
   }
-  
+
   private getSessionTime(s: any): number {
     if (!s || !s.date) return 0;
     return new Date(s.date).getTime();
   }
-  
+
+  // Build the “needs DOPE” list (highlighted at top)
+  private rebuildPendingSessions(): void {
+    if (!Array.isArray(this.sessions)) {
+      this.pendingSessions = [];
+      return;
+    }
+
+    this.pendingSessions = this.sessions
+      .filter(s => this.isSessionEditable(s) && !s.completed)
+      .sort((a, b) => this.getSessionTime(b) - this.getSessionTime(a)); // newest first
+  }
+
   clearSearch(): void {
     this.searchTerm = '';
   }
-  
+
   toggleVenue(venueId: number | null): void {
     this.expandedVenueId = this.expandedVenueId === venueId ? null : venueId;
   }
-  
+
   summarizeDateRange(sessions: any[]): string {
     if (!sessions || sessions.length === 0) return '';
     const sorted = [...sessions].sort((a, b) => this.getSessionTime(a) - this.getSessionTime(b));
@@ -193,6 +221,8 @@ export class HistoryTabComponent implements OnInit {
         console.error('Error saving sessions after delete:', err);
       }
     }
+
+    this.rebuildPendingSessions();
 
     if (this.selectedSessionId === s.id) {
       this.selectedSessionId = null;
@@ -246,11 +276,6 @@ export class HistoryTabComponent implements OnInit {
   // --------------------------------------------------
   // Wind auto-fill & helpers
   // --------------------------------------------------
-
-  /**
-   * If environment is present on the session, copy
-   * windSpeed + windDirection into any DOPE rows where they are missing.
-   */
   autoFillWindFromEnvironment(): void {
     if (!this.editSession || !this.editSession.environment || !Array.isArray(this.editSession.dope)) {
       return;
@@ -306,7 +331,6 @@ export class HistoryTabComponent implements OnInit {
     return field === 'windSpeed' ? !!row._windSpeedAuto : !!row._windDirectionAuto;
   }
 
-  // Maps degrees (0° at 12 o'clock, clockwise positive) to a little arrow string.
   private degreesToArrow(deg: number): string {
     const normalized = ((deg % 360) + 360) % 360;
 
@@ -379,10 +403,6 @@ export class HistoryTabComponent implements OnInit {
   // --------------------------------------------------
   // Save logic (in-progress vs completed)
   // --------------------------------------------------
-
-  /**
-   * Primary button: if all rows complete, mark completed, otherwise just save.
-   */
   onPrimarySaveClick(): void {
     if (!this.editSession) return;
 
@@ -411,6 +431,7 @@ export class HistoryTabComponent implements OnInit {
     if (idx >= 0) {
       this.sessions[idx] = { ...this.editSession, completed: false };
       this.persistSessions();
+      this.rebuildPendingSessions();
       this.showSaveMessage('Session saved (In progress).');
     }
   }
@@ -431,7 +452,13 @@ export class HistoryTabComponent implements OnInit {
     if (idx >= 0) {
       this.sessions[idx] = { ...this.editSession, completed: true };
       this.persistSessions();
+      this.rebuildPendingSessions();
       this.showSaveMessage('Session saved & marked as completed.');
+
+      // NEW: collapse back to History view
+      this.editSession = null;
+      this.selectedSessionId = null;
+      this.expandedVenueId = null;
     }
   }
 
@@ -466,7 +493,7 @@ export class HistoryTabComponent implements OnInit {
   }
 
   // --------------------------------------------------
-  // Closing detail (no changes)
+  // Closing detail
   // --------------------------------------------------
   closeEdit(): void {
     this.editSession = null;

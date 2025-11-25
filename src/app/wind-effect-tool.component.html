@@ -1,122 +1,152 @@
-<div class="flex flex-col h-full text-xs text-gray-100">
-  <!-- Top controls -->
-  <div class="space-y-2">
-    <!-- Rifle + distance row -->
-    <div class="grid grid-cols-3 gap-2">
-      <label class="flex flex-col">
-        <span class="mb-0.5 text-[10px] text-gray-300">Rifle</span>
-        <select
-          class="w-full px-2 py-1 rounded bg-black border border-gray-700 text-[11px]"
-          [(ngModel)]="selectedRifleId"
-          (change)="onRifleChange()">
-          <option [ngValue]="null">None</option>
-          <option *ngFor="let r of rifles" [ngValue]="r.id">
-            {{ r.name }}
-          </option>
-        </select>
+<div class="w-full h-full flex flex-col gap-3 text-gray-100 text-[11px]">
+  <!-- Header / inputs -->
+  <div class="flex items-end gap-3">
+    <div class="flex-1">
+      <label class="block text-[10px] text-gray-300 mb-0.5">
+        Wind speed (mph)
       </label>
-
-      <label class="flex flex-col">
-        <span class="mb-0.5 text-[10px] text-gray-300">Distance</span>
-        <div class="flex items-center gap-1">
-          <input
-            type="number"
-            class="w-full px-2 py-1 rounded bg-black border border-gray-700 text-[11px]"
-            [(ngModel)]="rangeMeters"
-            (change)="onRangeChange()"
-          />
-          <span class="text-[10px] text-gray-400">m</span>
-        </div>
-      </label>
-
-      <label class="flex flex-col">
-        <span class="mb-0.5 text-[10px] text-gray-300">Wind (m/s)</span>
-        <input
-          type="number"
-          class="w-full px-2 py-1 rounded bg-black border border-gray-700 text-[11px]"
-          [(ngModel)]="windSpeedMps"
-          (change)="onWindSpeedChange()"
-        />
-      </label>
-    </div>
-
-    <!-- Clock / direction row -->
-    <div class="flex items-center gap-2">
-      <span class="text-[10px] text-gray-400 w-14">Clock</span>
       <input
-        type="range"
-        min="1"
-        max="12"
-        [(ngModel)]="windClock"
-        (change)="onWindClockChange()"
-        class="flex-1"
+        type="number"
+        [(ngModel)]="windSpeedMph"
+        class="w-full bg-black border border-gray-700 rounded-xl px-2 py-1 text-[11px]"
+        min="0"
+        step="0.1"
       />
-      <span class="text-[10px] text-gray-200 w-10 text-right">
-        {{ windClock }}h
-      </span>
     </div>
 
-    <div class="text-[10px] text-gray-300 flex flex-wrap gap-x-3 gap-y-1">
-      <span class="text-orange-300 font-semibold">
-        {{ directionLabel }}
-      </span>
-      <span>Crosswind: {{ crosswindFactor | number:'1.2-2' }}</span>
-      <span>Drift: {{ driftCm | number:'1.0-0' }} cm</span>
-    </div>
-  </div>
-
-  <!-- Circle canvas -->
-  <div class="flex-1 flex items-center justify-center mt-2">
-    <div
-      class="relative w-64 h-64"
-      (mousedown)="onMouseDown($event)"
-      (mousemove)="onMouseMove($event)"
-      (mouseup)="onMouseUp()"
-    >
-      <canvas
-        #circleCanvas
-        width="220"
-        height="220"
-        class="absolute inset-0">
-      </canvas>
-
-      <canvas
-        #impactCanvas
-        width="220"
-        height="220"
-        class="absolute inset-0 pointer-events-none">
-      </canvas>
-    </div>
-  </div>
-
-  <!-- Holds row -->
-  <div class="mt-3 grid grid-cols-3 gap-2 text-[10px]">
-    <div class="bg-black/50 border border-gray-700 rounded-lg p-1.5">
-      <div class="text-gray-400">Hold (mil)</div>
-      <div class="text-sm font-semibold text-orange-300">
-        {{ holdMil | number:'1.2-2' }}
-      </div>
-    </div>
-
-    <div class="bg-black/50 border border-gray-700 rounded-lg p-1.5">
-      <div class="text-gray-400">Hold (MOA)</div>
-      <div class="text-sm font-semibold text-orange-300">
-        {{ holdMoa | number:'1.2-2' }}
-      </div>
-    </div>
-
-    <div class="bg-black/50 border border-gray-700 rounded-lg p-1.5">
-      <div class="text-gray-400">Approx drift</div>
-      <div class="text-sm font-semibold text-orange-300">
-        {{ driftCm | number:'1.0-0' }} cm
+    <div class="text-right text-[10px] leading-tight">
+      <div class="text-gray-400">Wind direction</div>
+      <div class="font-semibold text-gray-100">
+        {{ windClock }} o'clock
       </div>
     </div>
   </div>
 
-  <div class="mt-2 text-[9px] text-gray-400 leading-snug">
-    This is an approximate visualiser only. Crosswind factor is based on the
-    clock angle (12/6 = 0, 3/9 = 1). Adjust wind, distance and clock to see
-    relative hold and drift. Rifle data can refine default distance and flight
-    time per profile.
+  <!-- Circle with draggable arrow -->
+  <div
+    #circleArea
+    class="relative w-full max-w-xs mx-auto aspect-square select-none touch-none"
+    (pointerdown)="startDrag($event)"
+    (pointermove)="onDrag($event)"
+    (pointerup)="endDrag($event)"
+    (pointercancel)="endDrag($event)"
+    (pointerleave)="endDrag($event)"
+  >
+    <svg viewBox="0 0 100 100" class="w-full h-full">
+      <!-- Outer circle -->
+      <circle
+        cx="50"
+        cy="50"
+        r="40"
+        class="fill-[#020617] stroke-gray-600"
+        stroke-width="1.5"
+      ></circle>
+
+      <!-- Inner circle (impact zone) -->
+      <circle
+        cx="50"
+        cy="50"
+        r="22"
+        class="fill-[#020617] stroke-gray-700"
+        stroke-width="0.8"
+      ></circle>
+
+      <!-- Crosshair in the clock -->
+      <line
+        x1="50"
+        y1="30"
+        x2="50"
+        y2="70"
+        class="stroke-gray-600"
+        stroke-width="0.6"
+        stroke-linecap="round"
+      ></line>
+      <line
+        x1="30"
+        y1="50"
+        x2="70"
+        y2="50"
+        class="stroke-gray-600"
+        stroke-width="0.6"
+        stroke-linecap="round"
+      ></line>
+
+      <!-- Hour ticks + labels -->
+      <ng-container *ngFor="let h of hours">
+        <line
+          [attr.x1]="h.tickX1"
+          [attr.y1]="h.tickY1"
+          [attr.x2]="h.tickX2"
+          [attr.y2]="h.tickY2"
+          class="stroke-gray-500"
+          stroke-width="0.6"
+        ></line>
+        <text
+          [attr.x]="h.labelX"
+          [attr.y]="h.labelY"
+          text-anchor="middle"
+          alignment-baseline="middle"
+          class="fill-gray-300"
+          style="font-size: 4.5px;"
+        >
+          {{ h.hour }}
+        </text>
+      </ng-container>
+
+      <!-- Fat arrow on outer edge (draggable, pointing OUT from wind source) -->
+      <g [attr.transform]="'rotate(' + arrowAngleDeg + ' 50 50)'">
+        <!-- shaft from inner to outer edge -->
+        <line
+          x1="50"
+          y1="20"
+          x2="50"
+          y2="7"
+          class="stroke-orange-400"
+          stroke-width="2.8"
+          stroke-linecap="round"
+        ></line>
+        <!-- head pointing outward -->
+        <polygon
+          points="50,4 44,10 56,10"
+          class="fill-orange-400"
+        ></polygon>
+      </g>
+
+      <!-- Red POI dot (simple visual drift) -->
+      <circle
+        [attr.cx]="poiX"
+        [attr.cy]="poiY"
+        r="2.3"
+        class="fill-red-500"
+      ></circle>
+    </svg>
+  </div>
+
+  <p class="text-[10px] text-gray-400 text-center px-4 leading-snug">
+    Drag the orange arrow around the edge of the circle to set the
+    wind <span class="font-semibold">source</span> direction.
+    The arrow points away from where the wind is coming from.
+  </p>
+
+  <!-- Drift info column at bottom -->
+  <div class="mt-1 grid grid-cols-2 gap-2 text-[10px]">
+    <div class="bg-gray-900 rounded-xl px-2 py-1">
+      <div class="text-gray-400">Drift (mil)</div>
+      <div class="font-semibold text-gray-100">
+        {{ milDrift | number : '1.2-2' }}
+      </div>
+      <div class="text-[9px] text-gray-500 mt-0.5">
+        Full-value 10 mph ≈ 1 mil
+      </div>
+    </div>
+    <div class="bg-gray-900 rounded-xl px-2 py-1">
+      <div class="text-gray-400">Drift (MOA)</div>
+      <div class="font-semibold text-gray-100">
+        {{ moaDrift | number : '1.2-2' }}
+      </div>
+      <div class="text-[9px] text-gray-500 mt-0.5">
+        Based on {{ (milDrift | number:'1.2-2') }} mil
+      </div>
+    </div>
   </div>
 </div>

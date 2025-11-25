@@ -35,7 +35,7 @@
                 ← Back to menu
               </button>
 
-            <div class="text-[11px] font-semibold text-gray-100">
+              <div class="text-[11px] font-semibold text-gray-100">
                 Wind effect
               </div>
               <div class="w-16"></div>
@@ -205,52 +205,7 @@
                   </div>
                 </div>
 
-                <!-- Wind tool icon -->
-                <div class="mt-3 flex justify-center">
-                  <div class="flex flex-col items-center">
-                    <button
-                      class="w-12 h-12 rounded-full bg-black flex items-center justify-center shadow-lg border border-gray-600"
-                      (click)="onWindEffectToolClick()">
-                      <svg xmlns="http://www.w3.org/2000/svg"
-                           viewBox="0 0 24 24"
-                           class="w-6 h-6">
-                        <circle cx="12" cy="12" r="9" class="fill-transparent stroke-white" stroke-width="1" />
-                        <path class="stroke-white" stroke-width="1.5" stroke-linecap="round"
-                              d="M6 12h9M12 8l3 4-3 4" />
-                      </svg>
-                    </button>
-                    <span class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
-                      Wind effect
-                    </span>
-                    <span class="text-[9px] text-gray-500 italic mt-0.5">
-                      {{ selectedTool === 'windEffect' ? 'Tap to close' : 'Tap to open' }}
-                    </span>
-                  </div>
-                </div>
-
-                <!-- Load Development tool icon (bullet) -->
-                <div class="mt-3 flex justify-center">
-                  <div class="flex flex-col items-center">
-                    <button
-                      class="w-12 h-12 rounded-full bg-black flex items-center justify-center shadow-lg border border-gray-600 hover:scale-105 transition"
-                      (click)="setTab('loadDev')">
-                      <!-- Bullet icon -->
-                      <svg xmlns="http://www.w3.org/2000/svg"
-                           viewBox="0 0 24 24"
-                           class="w-6 h-6 fill-white">
-                        <path d="M12 2c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2s2-.9 2-2V4c0-1.1-.9-2-2-2zm-4 10v2c0 2.2 1.8 4 4 4s4-1.8 4-4v-2h-8zM8 16v2h8v-2H8zm1 3v1h6v-1H9z"/>
-                      </svg>
-                    </button>
-                    <span class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
-                      Load development
-                    </span>
-                    <span class="text-[9px] text-gray-500 italic mt-0.5">
-                      Tap to open
-                    </span>
-                  </div>
-                </div>
-
-                <!-- Kestrel details -->
+                <!-- Kestrel details directly under the top row -->
                 <div *ngIf="selectedTool === 'kestrel'" class="mt-2 space-y-1 text-[10px]">
                   <p [ngClass]="kestrelError ? 'text-red-400' : 'text-gray-300'">
                     {{ kestrelStatus }}
@@ -300,7 +255,7 @@
                   </div>
                 </div>
 
-                <!-- Converter panel -->
+                <!-- Converter panel directly under the top row -->
                 <div *ngIf="selectedTool === 'converter'" class="mt-2 text-[10px] space-y-2">
                   <div class="grid grid-cols-2 gap-2">
                     <div>
@@ -328,6 +283,54 @@
                     Result:
                     <span class="font-semibold">
                       {{ converterOutput | number:'1.3-3' }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Wind effect + Load development row
+                     Hidden while Kestrel or Converter is open -->
+                <div
+                  *ngIf="selectedTool !== 'kestrel' && selectedTool !== 'converter'"
+                  class="mt-3 flex justify-center gap-10"
+                >
+                  <!-- Wind tool icon -->
+                  <div class="flex flex-col items-center">
+                    <button
+                      class="w-12 h-12 rounded-full bg-black flex items-center justify-center shadow-lg border border-gray-600"
+                      (click)="onWindEffectToolClick()">
+                      <svg xmlns="http://www.w3.org/2000/svg"
+                           viewBox="0 0 24 24"
+                           class="w-6 h-6">
+                        <circle cx="12" cy="12" r="9" class="fill-transparent stroke-white" stroke-width="1" />
+                        <path class="stroke-white" stroke-width="1.5" stroke-linecap="round"
+                              d="M6 12h9M12 8l3 4-3 4" />
+                      </svg>
+                    </button>
+                    <span class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
+                      Wind effect
+                    </span>
+                    <span class="text-[9px] text-gray-500 italic mt-0.5">
+                      {{ selectedTool === 'windEffect' ? 'Tap to close' : 'Tap to open' }}
+                    </span>
+                  </div>
+
+                  <!-- Load Development tool icon (bullet) -->
+                  <div class="flex flex-col items-center">
+                    <button
+                      class="w-12 h-12 rounded-full bg-black flex items-center justify-center shadow-lg border border-gray-600 hover:scale-105 transition"
+                      (click)="setTab('loadDev')">
+                      <!-- Bullet icon -->
+                      <svg xmlns="http://www.w3.org/2000/svg"
+                           viewBox="0 0 24 24"
+                           class="w-6 h-6 fill-white">
+                        <path d="M12 2c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2s2-.9 2-2V4c0-1.1-.9-2-2-2zm-4 10v2c0 2.2 1.8 4 4 4s4-1.8 4-4v-2h-8zM8 16v2h8v-2H8zm1 3v1h6v-1H9z"/>
+                      </svg>
+                    </button>
+                    <span class="mt-1 text-[10px] text-gray-300 border-b border-dashed border-gray-600/60 pb-[1px]">
+                      Load development
+                    </span>
+                    <span class="text-[9px] text-gray-500 italic mt-0.5">
+                      Tap to open
                     </span>
                   </div>
                 </div>

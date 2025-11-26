@@ -49,6 +49,7 @@ export interface Venue {
 export interface Environment {
   // basic conditions
   temperatureC?: number;
+  pressureInHg?: number;
 
   // match what session-tab & history-tab are using
   pressureHpa?: number;         // hPa

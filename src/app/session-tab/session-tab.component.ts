@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, Output, EventEmitter, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../data.service';
 import {
@@ -11,6 +11,7 @@ import {
   Session
 } from '../models';
 import { BleClient } from '@capacitor-community/bluetooth-le';
+import { KestrelDataSnapshot, KestrelService } from '../shared/services/kestrel-bluetooth.service';
 
 type WizardStep = 'setup' | 'environment' | 'shots' | 'complete';
 
@@ -59,9 +60,11 @@ export class SessionTabComponent implements OnInit {
   kestrelConnected = false;
   kestrelStatus = 'Not connected';
   kestrelLastUpdate: Date | null = null;
-  kestrelData: KestrelSnapshot | null = null;
+  kestrelData: KestrelDataSnapshot | null = null;
   kestrelError: string | null = null;
   kestrelIsConnecting = false;
+ public kestrel: KestrelService = inject(KestrelService)
+
 
   // Track current device + auto-disconnect timer
   private kestrelDeviceId: string | null = null;
@@ -186,232 +189,11 @@ export class SessionTabComponent implements OnInit {
     }
   }
 
-  private async forceKestrelDisconnect(): Promise<void> {
-    this.clearKestrelAutoDisconnect();
 
-    if (this.kestrelDeviceId) {
-      try {
-        await BleClient.disconnect(this.kestrelDeviceId);
-      } catch (err) {
-        console.warn('Error during Kestrel auto-disconnect:', err);
-      }
-    }
-
-    this.kestrelConnected = false;
-    this.kestrelIsConnecting = false;
-    this.kestrelDeviceId = null;
-    this.kestrelStatus = 'Not connected (auto-disconnected after 1 minute)';
-    // Intentionally do NOT clear environment.* so values stay for the session
-  }
-
-  private scheduleKestrelAutoDisconnect(): void {
-    this.clearKestrelAutoDisconnect();
-
-    if (!this.kestrelConnected || !this.kestrelDeviceId) {
-      return;
-    }
-
-    this.kestrelAutoDisconnectTimer = setTimeout(() => {
-      console.log('Kestrel auto-disconnect: 60 seconds elapsed, disconnecting…');
-      void this.forceKestrelDisconnect();
-    }, 60_000);
-  }
-
-  async connectKestrelBluetooth(): Promise<void> {
-    // Clean up previous timer/connection
-    this.clearKestrelAutoDisconnect();
-    if (this.kestrelConnected && this.kestrelDeviceId) {
-      try {
-        await BleClient.disconnect(this.kestrelDeviceId);
-      } catch (err) {
-        console.warn('Error disconnecting previous Kestrel connection:', err);
-      } finally {
-        this.kestrelConnected = false;
-        this.kestrelDeviceId = null;
-      }
-    }
-
-    this.kestrelError = null;
-    this.kestrelIsConnecting = true;
-    this.kestrelStatus = 'Scanning for Kestrel…';
-
-    const kestrelServiceUuid = '03290000-eab4-dea1-b24e-44ec023874db';
-    const sensorMeasurementsUuid = '03290310-eab4-dea1-b24e-44ec023874db';
-
-    try {
-      await BleClient.initialize({ androidNeverForLocation: true });
-
-      const enabled = await BleClient.isEnabled().catch(() => true);
-      if (!enabled) {
-        this.kestrelStatus = 'Bluetooth is off – asking to enable…';
-        await BleClient.requestEnable();
-      }
-
-      let foundDevice: any = null;
-
-      this.kestrelStatus = 'Scanning for Kestrel (up to 8s)…';
-      console.log('Starting BLE scan…');
-
-      await BleClient.requestLEScan(
-        {} as any,
-        (result) => {
-          const dev = result.device;
-          const name = (dev?.name || '').trim();
-          console.log('Scan result:', dev);
-
-          if (!foundDevice && name) {
-            const lower = name.toLowerCase();
-
-            const looksLikeKestrel =
-              lower.startsWith('elite') ||
-              lower.includes('elite') ||
-              lower.includes('2998') ||
-              lower.includes('kestrel') ||
-              lower.startsWith('k5') ||
-              lower.startsWith('k7') ||
-              lower.includes('5700');
-
-            if (looksLikeKestrel) {
-              foundDevice = dev;
-              this.kestrelStatus = `Found ${name}, preparing to connect…`;
-              console.log('Selected Kestrel candidate:', dev);
-            }
-          }
-        }
-      );
-
-      const timeoutMs = 10000;
-      const start = Date.now();
-      while (!foundDevice && Date.now() - start < timeoutMs) {
-        await this.sleep(400);
-      }
-
-      await BleClient.stopLEScan().catch(err =>
-        console.warn('stopLEScan failed (not fatal):', err)
-      );
-      console.log('Stopped BLE scan');
-
-      if (!foundDevice) {
-        this.kestrelStatus = 'No Kestrel device found during scan.';
-        this.kestrelError =
-          'No Kestrel seen in BLE scan. Ensure LiNK/Bluetooth is enabled on the device.';
-        return;
-      }
-
-      const device = foundDevice;
-      this.kestrelDeviceId = device.deviceId || device.id || null;
-
-      this.kestrelStatus = `Connecting to ${device.name || device.deviceId}…`;
-      console.log('Connecting to device:', device);
-
-      await BleClient.connect(device.deviceId, (id) => {
-        console.log('Kestrel disconnected', id);
-        this.kestrelConnected = false;
-        this.clearKestrelAutoDisconnect();
-        this.kestrelDeviceId = null;
-        this.kestrelStatus = 'Not connected';
-      });
-
-      let services: any[] = [];
-      try {
-        services = await BleClient.getServices(device.deviceId);
-        console.log(
-          'Kestrel services discovered (FULL LIST):',
-          JSON.stringify(services, null, 2)
-        );
-      } catch (e) {
-        console.warn('getServices failed (not fatal):', e);
-      }
-
-      const service = services.find(s =>
-        s.uuid?.toLowerCase() === kestrelServiceUuid.toLowerCase()
-      );
-
-      if (!service) {
-        this.kestrelStatus =
-          'Connected to device, but Kestrel Weather service UUID was not found.';
-        this.kestrelError =
-          'Check console for full service list; Weather service 03290000-… must be present.';
-        this.kestrelConnected = true; // connected, but no weather service
-        this.kestrelLastUpdate = new Date();
-        return;
-      }
-
-      const char = (service.characteristics || []).find((c: any) =>
-        c.uuid?.toLowerCase() === sensorMeasurementsUuid.toLowerCase()
-      );
-
-      if (!char) {
-        this.kestrelStatus =
-          'Connected, Weather service found, but Sensor Measurements characteristic (03290310-…) not found.';
-        this.kestrelError =
-          'Check console for characteristics under 03290000-… and adjust sensorMeasurementsUuid if needed.';
-        this.kestrelConnected = true;
-        this.kestrelLastUpdate = new Date();
-        return;
-      }
-
-      const value = await BleClient.read(
-        device.deviceId,
-        kestrelServiceUuid,
-        sensorMeasurementsUuid
-      );
-
-      const dv =
-        value instanceof DataView
-          ? value
-          : new DataView(
-              (value as any).buffer
-                ? (value as any).buffer
-                : new Uint8Array(value as any).buffer
-            );
-
-      // Byte layout guess:
-      // wind, temp, humidity, pressure – each 2 bytes, LE, x10
-      const windRaw = dv.getUint16(0, true);     // m/s * 10
-      const tempRaw = dv.getInt16(2, true);      // °C * 10
-      const rhRaw = dv.getUint16(4, true);       // % * 10
-      const pressureRaw = dv.getUint16(6, true); // hPa * 10
-
-      const windMs = windRaw / 100;
-      const windMph = windMs * 2.23694;
-      const tempC = tempRaw / 100;
-      const humidity = rhRaw / 10;
-      const pressureHpa = pressureRaw / 10;
-
-      console.log('Kestrel SensorMeasurements raw:', {
-        windRaw,
-        tempRaw,
-        rhRaw,
-        pressureRaw
-      });
-
-      // Push into environment model (mph in UI)
-      this.environment.temperatureC = tempC;
-      this.environment.humidityPercent = humidity;
-      this.environment.pressureHpa = pressureHpa;
-      this.environment.windSpeedMps = parseFloat(windMph.toFixed(1));
-
-      // NOTE: DA explicitly removed here – we do not read or store DA in sessions.
-      this.kestrelData = {
-        temperatureC: tempC,
-        humidityPercent: humidity,
-        pressureHpa,
-        windSpeedMph: parseFloat(windMph.toFixed(1)),
-        windClock: this.windClock ?? 12
-      };
-
-      this.kestrelConnected = true;
-      this.kestrelLastUpdate = new Date();
-      this.kestrelStatus = `Connected to ${device.name || 'Kestrel'} and imported data.`;
-    } catch (err: any) {
-      console.error('Kestrel Bluetooth error:', err);
-      this.kestrelStatus = 'Kestrel connection failed.';
-      this.kestrelError = err?.message || String(err);
-    } finally {
-      this.kestrelIsConnecting = false;
-      this.scheduleKestrelAutoDisconnect();
-    }
+  async onKestrelButtonClick(): Promise<void> {
+    await this.kestrel.connectKestrelBluetooth();
+    this.kestrelData = this.kestrel.kestrelData$.getValue();
+    this.environment = this.kestrelData as any;
   }
 
   // ---------- Environment step ----------

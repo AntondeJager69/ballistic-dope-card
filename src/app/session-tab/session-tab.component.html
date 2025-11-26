@@ -152,16 +152,17 @@
             Kestrel quick sync
           </div>
           <div class="text-[10px] text-gray-400 line-clamp-2">
-            {{ kestrelStatus }}
+          {{ kestrel.kestrelStatus$ | async }}
           </div>
         </div>
 
         <button
           class="px-3 py-1.5 text-[10px] rounded-full border border-orange-500 font-semibold
                  bg-orange-500 text-black disabled:opacity-50 disabled:cursor-not-allowed"
-          (click)="connectKestrelBluetooth()"
-          [disabled]="kestrelIsConnecting">
-          {{ kestrelIsConnecting ? 'Connecting…' : 'Read now' }}
+          (click)="onKestrelButtonClick()"
+          [disabled]="(kestrel.kestrelIsConnecting$ | async)">
+          {{ (kestrel.kestrelIsConnecting$ | async) ? 'Connecting…' : 'Read now'  }}
+          
         </button>
       </div>
 
@@ -173,7 +174,7 @@
         <div>
           Pressure:
           <span class="font-semibold">
-            {{ kestrelData.pressureHpa | number:'1.0-0' }} hPa
+            {{ kestrelData.pressureInHg | number:'1.0-0' }} inHg
           </span>
         </div>
         <div>
@@ -208,11 +209,11 @@
       <div class="flex flex-col items-stretch">
         <span
           class="text-[10px] text-gray-300 mb-1 text-center whitespace-nowrap">
-          Pressure (hPa)
+          Pressure (inHg)
         </span>
         <input
           type="number"
-          [(ngModel)]="environment.pressureHpa"
+          [(ngModel)]="environment.pressureInHg"
           class="px-2 py-1 rounded bg-black border border-gray-700 text-center"
         />
       </div>

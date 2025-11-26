@@ -148,13 +148,13 @@
                     <button
                       class="w-12 h-12 rounded-full flex items-center justify-center shadow-lg border border-gray-600 transition-transform duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
                       [ngClass]="{
-                        'bg-orange-500 hover:scale-105': !kestrelIsConnecting && !kestrelError && !kestrelData,
-                        'bg-blue-500 animate-pulse': kestrelIsConnecting,
-                        'bg-green-600 hover:scale-105': !kestrelIsConnecting && kestrelData && !kestrelError,
-                        'bg-red-600': kestrelError
+                        'bg-orange-500 hover:scale-105': !(kestrel.kestrelIsConnecting$ | async) && !kestrel.kestrelError && !kestrelData,
+                        'bg-blue-500 animate-pulse': kestrel.kestrelIsConnecting$ | async,
+                        'bg-green-600 hover:scale-105': !(kestrel.kestrelIsConnecting$ | async) && kestrelData && !kestrel.kestrelError,
+                        'bg-red-600': kestrel.kestrelError
                       }"
-                      (click)="onKestrelToolClick()"
-                      [disabled]="kestrelIsConnecting">
+                      (click)="onKestrelButtonClick()"
+                      [disabled]="kestrel.kestrelIsConnecting$ | async">
 
                       <!-- Simple "Kestrel" SVG icon -->
                       <svg
@@ -207,12 +207,12 @@
 
                 <!-- Kestrel details directly under the top row -->
                 <div *ngIf="selectedTool === 'kestrel'" class="mt-2 space-y-1 text-[10px]">
-                  <p [ngClass]="kestrelError ? 'text-red-400' : 'text-gray-300'">
-                    {{ kestrelStatus }}
+                  <p [ngClass]="kestrel.kestrelError ? 'text-red-400' : 'text-gray-300'">
+                    {{ kestrel.kestrelStatus$ |async}}
                   </p>
 
-                  <span class="text-[8px] text-gray-500" *ngIf="kestrelLastUpdated">
-                    Last updated: {{ kestrelLastUpdated | date:'yyyy-MM-dd HH:mm:ss' }}
+                  <span class="text-[8px] text-gray-500" *ngIf="kestrel.kestrelLastUpdated">
+                    Last updated: {{ kestrel.kestrelLastUpdated | date:'yyyy-MM-dd HH:mm:ss' }}
                   </span>
 
                   <div *ngIf="kestrelData" class="mt-1 grid grid-cols-2 gap-1">
@@ -232,12 +232,6 @@
                       Pressure:
                       <span class="font-semibold text-gray-100">
                         {{ kestrelData.pressureInHg | number:'1.2-2' }} inHg
-                      </span>
-                    </div>
-                    <div>
-                      D. Alt:
-                      <span class="font-semibold text-gray-100">
-                        {{ kestrelData.densityAltitudeM | number:'1.0-0' }} m
                       </span>
                     </div>
                     <div>

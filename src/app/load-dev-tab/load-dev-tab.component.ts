@@ -101,7 +101,7 @@ export class LoadDevTabComponent implements OnInit {
 
   constructor(private data: DataService) {}
 
-  // ---------------- lifecycle ----------------
+  // ---------- lifecycle ----------
 
   ngOnInit(): void {
     this.rifles = this.data.getRifles();
@@ -111,7 +111,7 @@ export class LoadDevTabComponent implements OnInit {
     }
   }
 
-  // ---------------- helpers ----------------
+  // ---------- helpers ----------
 
   private createEmptyProjectForm(): ProjectForm {
     return {
@@ -180,7 +180,7 @@ export class LoadDevTabComponent implements OnInit {
     }
   }
 
-  // ---------------- rifles & projects ----------------
+  // ---------- rifles & projects ----------
 
   onRifleChange(): void {
     this.loadProjects();
@@ -231,7 +231,7 @@ export class LoadDevTabComponent implements OnInit {
   }
 
   private updateHasResultsFlag(): void {
-    // ✅ Treat “has results” as “has any entries”, not only ones with velocity stats
+    // “Has results” = there are entries, even if they don't have velocities yet
     this.hasResultsForSelectedProject =
       !!this.selectedProject &&
       !!this.selectedProject.entries &&
@@ -242,7 +242,7 @@ export class LoadDevTabComponent implements OnInit {
     this.resultsCollapsed = !this.resultsCollapsed;
   }
 
-  // ---------------- projects CRUD ----------------
+  // ---------- project CRUD ----------
 
   newProject(): void {
     if (!this.selectedRifleId) {
@@ -294,10 +294,10 @@ export class LoadDevTabComponent implements OnInit {
     while (charge <= endChargeGr + 1e-6) {
       const roundedCharge = Number(charge.toFixed(2));
 
+      // Use updateLoadDevEntry so DataService can create if not present
       const entry: LoadDevEntry = {
         id: localId++,
-        // string, not undefined
-        loadLabel: '',
+        loadLabel: '', // string, not undefined
         powder: undefined,
         chargeGr: roundedCharge,
         coal: undefined,
@@ -321,13 +321,14 @@ export class LoadDevTabComponent implements OnInit {
 
   saveProject(): void {
     if (!this.projectForm.rifleId || !this.projectForm.name.trim()) {
-      alert('Enter name');
+      alert('Please select rifle and enter name.');
       return;
     }
 
     if (this.editingProject) {
       const updated: LoadDevProject = {
         ...this.editingProject,
+        rifleId: this.projectForm.rifleId,
         name: this.projectForm.name.trim(),
         type: this.projectForm.type,
         notes: this.projectForm.notes.trim()
@@ -335,6 +336,7 @@ export class LoadDevTabComponent implements OnInit {
       this.data.updateLoadDevProject(updated);
       this.selectedProjectId = updated.id;
     } else {
+      // Create project directly with updateLoadDevProject, DataService will store it
       const newProject: LoadDevProject = {
         id: Date.now(),
         rifleId: this.projectForm.rifleId,
@@ -347,7 +349,7 @@ export class LoadDevTabComponent implements OnInit {
       this.data.updateLoadDevProject(newProject);
       this.selectedProjectId = newProject.id;
 
-      // create ladder entries straight away
+      // Then auto-create ladder entries
       this.createLadderEntriesFromPlanner(newProject.id);
     }
 
@@ -355,11 +357,11 @@ export class LoadDevTabComponent implements OnInit {
     this.editingProject = null;
     this.projectForm = this.createEmptyProjectForm();
     this.planner = this.createEmptyPlannerForm();
-    this.loadProjects(); // reload + refresh selectedProject + results flag
+    this.loadProjects();
   }
 
   deleteProject(project: LoadDevProject): void {
-    if (!confirm(`Delete ${project.name}?`)) return;
+    if (!confirm(`Delete project "${project.name}"?`)) return;
     this.data.deleteLoadDevProject(project.id);
     if (this.selectedProjectId === project.id) {
       this.selectedProject = null;
@@ -368,7 +370,7 @@ export class LoadDevTabComponent implements OnInit {
     this.loadProjects();
   }
 
-  // ---------------- entries ----------------
+  // ---------- entries ----------
 
   newEntry(): void {
     if (!this.selectedProject) {
@@ -481,7 +483,7 @@ export class LoadDevTabComponent implements OnInit {
     }
   }
 
-  // ---------------- velocity stats ----------------
+  // ---------- velocity stats ----------
 
   private parseVelocityInput(raw: string | undefined | null): number[] {
     if (!raw) return [];
@@ -520,7 +522,7 @@ export class LoadDevTabComponent implements OnInit {
     return Math.sqrt(variance);
   }
 
-  // ---------------- node detection ----------------
+  // ---------- node detection ----------
 
   private computeNodesForSelectedProject(): Map<number, number> {
     const map = new Map<number, number>();
@@ -586,7 +588,7 @@ export class LoadDevTabComponent implements OnInit {
     };
   }
 
-  // ---------------- ladder wizard ----------------
+  // ---------- ladder wizard ----------
 
   startLadderWizard(): void {
     if (!this.selectedProject || this.selectedProject.type !== 'ladder') {
@@ -658,27 +660,34 @@ export class LoadDevTabComponent implements OnInit {
     this.velocityEditValue = any.velocityInput ?? '';
   }
 
-  saveVelocityAndNext(): void {
-    if (!this.selectedProject || !this.velocityEditEntry) return;
+ saveVelocityAndNext(): void {
+  if (!this.selectedProject || !this.velocityEditEntry) return;
 
-    const trimmed = this.velocityEditValue.trim();
-    if (trimmed) {
-      const v = Number(trimmed);
-      if (Number.isFinite(v) && v > 0) {
-        const entry = this.velocityEditEntry;
-        const any = entry as any;
-        const existing = this.parseVelocityInput(any.velocityInput);
-        const updated = [...existing, v];
-        any.velocityInput = updated.join(' ');
-        entry.shotsFired = updated.length;
+  const raw = this.velocityEditValue ?? '';
+  const trimmed = raw.toString().trim();   // <-- safe for number or string
 
-        this.data.updateLoadDevEntry(this.selectedProject.id, entry);
-        this.refreshSelectedProject();
-      }
+  if (trimmed) {
+    const v = Number(trimmed);
+    if (Number.isFinite(v) && v > 0) {
+      const entry = this.velocityEditEntry;
+      const any = entry as any;
+      const existing = this.parseVelocityInput(any.velocityInput);
+      const updated = [...existing, v];
+      any.velocityInput = updated.join(' ');
+      entry.shotsFired = updated.length;
+
+      this.data.updateLoadDevEntry(this.selectedProject.id, entry);
+      this.refreshSelectedProject();
+    } else {
+      alert('Invalid velocity');
+      return;
     }
-
-    this.goToNextWizardEntry();
+  } else {
+    // empty -> nothing to save, just move on
   }
+
+  this.goToNextWizardEntry();
+}
 
   skipVelocityAndNext(): void {
     this.goToNextWizardEntry();
@@ -688,7 +697,7 @@ export class LoadDevTabComponent implements OnInit {
     this.finishLadderWizard();
   }
 
-  // ---------------- single-row velocity edit ----------------
+  // ---------- single-row velocity edit ----------
 
   editVelocityForEntry(entry: LoadDevEntry): void {
     this.ladderWizardActive = false;
@@ -699,37 +708,39 @@ export class LoadDevTabComponent implements OnInit {
   }
 
   saveSingleVelocity(): void {
-    if (!this.selectedProject || !this.velocityEditEntry) {
-      this.singleVelocityEditActive = false;
-      return;
-    }
+  if (!this.selectedProject || !this.velocityEditEntry) {
+    this.singleVelocityEditActive = false;
+    return;
+  }
 
-    const trimmed = this.velocityEditValue.trim();
-    if (!trimmed) {
-      this.singleVelocityEditActive = false;
-      this.cancelVelocityEdit();
-      return;
-    }
+  const raw = this.velocityEditValue ?? '';
+  const trimmed = raw.toString().trim();   // <-- safe for number or string
 
-    const v = Number(trimmed);
-    if (!Number.isFinite(v) || v <= 0) {
-      alert('Invalid velocity');
-      return;
-    }
-
-    const entry = this.velocityEditEntry;
-    const any = entry as any;
-    const existing = this.parseVelocityInput(any.velocityInput);
-    const updated = [...existing, v];
-    any.velocityInput = updated.join(' ');
-    entry.shotsFired = updated.length;
-
-    this.data.updateLoadDevEntry(this.selectedProject.id, entry);
-    this.refreshSelectedProject();
-
+  if (!trimmed) {
     this.singleVelocityEditActive = false;
     this.cancelVelocityEdit();
+    return;
   }
+
+  const v = Number(trimmed);
+  if (!Number.isFinite(v) || v <= 0) {
+    alert('Invalid velocity');
+    return;
+  }
+
+  const entry = this.velocityEditEntry;
+  const any = entry as any;
+  const existing = this.parseVelocityInput(any.velocityInput);
+  const updated = [...existing, v];
+  any.velocityInput = updated.join(' ');
+  entry.shotsFired = updated.length;
+
+  this.data.updateLoadDevEntry(this.selectedProject.id, entry);
+  this.refreshSelectedProject();
+
+  this.singleVelocityEditActive = false;
+  this.cancelVelocityEdit();
+}
 
   cancelSingleVelocityEdit(): void {
     this.singleVelocityEditActive = false;

@@ -99,6 +99,13 @@ export class LoadDevTabComponent implements OnInit {
   // Single-row velocity edit
   singleVelocityEditActive = false;
 
+  // Graph state
+  showGraph = false;
+  graphCoords: { x: number; y: number; charge: number; avg: number }[] = [];
+  graphSvgPoints = '';
+  graphMinVel = 0;
+  graphMaxVel = 0;
+
   constructor(private data: DataService) {}
 
   // ---------- lifecycle ----------
@@ -192,6 +199,7 @@ export class LoadDevTabComponent implements OnInit {
       this.selectedProject = null;
       this.selectedProjectId = null;
       this.hasResultsForSelectedProject = false;
+      this.rebuildGraphData();
       return;
     }
 
@@ -209,6 +217,8 @@ export class LoadDevTabComponent implements OnInit {
     }
 
     this.updateHasResultsFlag();
+    this.rebuildGraphData();
+    if (!this.graphCoords.length) this.showGraph = false;
   }
 
   private refreshSelectedProject(): void {
@@ -217,16 +227,22 @@ export class LoadDevTabComponent implements OnInit {
     this.selectedProject =
       this.projects.find(p => p.id === this.selectedProjectId) ?? null;
     this.updateHasResultsFlag();
+    this.rebuildGraphData();
+    if (!this.graphCoords.length) this.showGraph = false;
   }
 
   onProjectSelectChange(): void {
     if (this.selectedProjectId == null) {
       this.selectedProject = null;
       this.updateHasResultsFlag();
+      this.rebuildGraphData();
+      this.showGraph = false;
     } else {
       this.selectedProject =
         this.projects.find(p => p.id === this.selectedProjectId) ?? null;
       this.updateHasResultsFlag();
+      this.rebuildGraphData();
+      if (!this.graphCoords.length) this.showGraph = false;
     }
   }
 
@@ -599,7 +615,7 @@ export class LoadDevTabComponent implements OnInit {
     });
   }
 
-  // ---------- wizard: append helper ----------
+  // ---------- wizard append helper ----------
 
   private appendVelocityToEntry(entry: LoadDevEntry, value: number): void {
     if (!this.selectedProject) return;
@@ -613,6 +629,66 @@ export class LoadDevTabComponent implements OnInit {
 
     this.data.updateLoadDevEntry(this.selectedProject.id, entry);
     this.refreshSelectedProject();
+  }
+
+  // ---------- graph data builder ----------
+
+  private rebuildGraphData(): void {
+    this.graphCoords = [];
+    this.graphSvgPoints = '';
+    this.graphMinVel = 0;
+    this.graphMaxVel = 0;
+
+    if (!this.selectedProject || !this.selectedProject.entries?.length) {
+      return;
+    }
+
+    const pts: { charge: number; avg: number }[] = [];
+
+    for (const e of this.selectedProject.entries) {
+      if (e.chargeGr == null) continue;
+      const stats = this.statsForEntry(e);
+      if (!stats) continue;
+      pts.push({ charge: e.chargeGr, avg: stats.avg });
+    }
+
+    if (!pts.length) return;
+
+    // sort by charge (x-axis)
+    pts.sort((a, b) => a.charge - b.charge);
+
+    let min = pts[0].avg;
+    let max = pts[0].avg;
+    for (const p of pts) {
+      if (p.avg < min) min = p.avg;
+      if (p.avg > max) max = p.avg;
+    }
+
+    const padding = (max - min) * 0.1 || 10;
+    this.graphMinVel = min - padding;
+    this.graphMaxVel = max + padding;
+
+    const n = pts.length;
+    const span = this.graphMaxVel - this.graphMinVel || 1;
+    const coords: { x: number; y: number; charge: number; avg: number }[] = [];
+
+    for (let i = 0; i < n; i++) {
+      const p = pts[i];
+      const x = n === 1 ? 50 : (i / (n - 1)) * 100;
+      const y = 55 - ((p.avg - this.graphMinVel) / span) * 45;
+      coords.push({ x, y, charge: p.charge, avg: p.avg });
+    }
+
+    this.graphCoords = coords;
+    this.graphSvgPoints = coords.map(c => `${c.x},${c.y}`).join(' ');
+  }
+
+  toggleGraph(): void {
+    if (!this.graphCoords.length) {
+      alert('No velocity data to graph yet.');
+      return;
+    }
+    this.showGraph = !this.showGraph;
   }
 
   // ---------- ladder wizard ----------

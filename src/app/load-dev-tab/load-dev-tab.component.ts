@@ -599,6 +599,22 @@ export class LoadDevTabComponent implements OnInit {
     });
   }
 
+  // ---------- wizard: append helper ----------
+
+  private appendVelocityToEntry(entry: LoadDevEntry, value: number): void {
+    if (!this.selectedProject) return;
+
+    const any = entry as any;
+    const existing = this.parseVelocityInput(any.velocityInput);
+    const updated = [...existing, value];
+
+    any.velocityInput = updated.join(' ');
+    entry.shotsFired = updated.length;
+
+    this.data.updateLoadDevEntry(this.selectedProject.id, entry);
+    this.refreshSelectedProject();
+  }
+
   // ---------- ladder wizard ----------
 
   startLadderWizard(): void {
@@ -687,15 +703,7 @@ export class LoadDevTabComponent implements OnInit {
     if (trimmed) {
       const v = Number(trimmed);
       if (Number.isFinite(v) && v > 0) {
-        const entry = this.velocityEditEntry;
-        const any = entry as any;
-        const existing = this.parseVelocityInput(any.velocityInput);
-        const updated = [...existing, v];
-        any.velocityInput = updated.join(' ');
-        entry.shotsFired = updated.length;
-
-        this.data.updateLoadDevEntry(this.selectedProject.id, entry);
-        this.refreshSelectedProject();
+        this.appendVelocityToEntry(this.velocityEditEntry, v);
       } else {
         alert('Invalid velocity');
         return;
@@ -713,7 +721,7 @@ export class LoadDevTabComponent implements OnInit {
     this.finishLadderWizard();
   }
 
-  // ---------- single-row velocity edit ----------
+  // ---------- single-row velocity edit (REPLACE set) ----------
 
   editVelocityForEntry(entry: LoadDevEntry): void {
     this.ladderWizardActive = false;
@@ -732,26 +740,32 @@ export class LoadDevTabComponent implements OnInit {
     const raw = this.velocityEditValue ?? '';
     const trimmed = raw.toString().trim();
 
+    // If user clears it completely, remove velocities for this row
     if (!trimmed) {
+      const any = this.velocityEditEntry as any;
+      any.velocityInput = undefined;
+      this.velocityEditEntry.shotsFired = undefined;
+      this.data.updateLoadDevEntry(this.selectedProject.id, this.velocityEditEntry);
+      this.refreshSelectedProject();
       this.singleVelocityEditActive = false;
       this.cancelVelocityEdit();
       return;
     }
 
-    const v = Number(trimmed);
-    if (!Number.isFinite(v) || v <= 0) {
-      alert('Invalid velocity');
+    // User may type one or more numbers: "2805", or "2805 2810 2808"
+    const values = this.parseVelocityInput(trimmed);
+    if (!values.length) {
+      alert(
+        'Enter one or more numeric velocities, separated by spaces or commas.'
+      );
       return;
     }
 
-    const entry = this.velocityEditEntry;
-    const any = entry as any;
-    const existing = this.parseVelocityInput(any.velocityInput);
-    const updated = [...existing, v];
-    any.velocityInput = updated.join(' ');
-    entry.shotsFired = updated.length;
+    const any = this.velocityEditEntry as any;
+    any.velocityInput = values.join(' ');
+    this.velocityEditEntry.shotsFired = values.length;
 
-    this.data.updateLoadDevEntry(this.selectedProject.id, entry);
+    this.data.updateLoadDevEntry(this.selectedProject.id, this.velocityEditEntry);
     this.refreshSelectedProject();
 
     this.singleVelocityEditActive = false;

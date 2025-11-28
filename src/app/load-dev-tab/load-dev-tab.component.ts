@@ -25,22 +25,17 @@ interface EntryForm {
   primer: string;
   bullet: string;
   bulletWeightGr: number | null;
-  bulletBc: string;                 // ✅ BC per entry
+  bulletBc: string;
   distanceM: number | null;
   shotsFired: number | null;
   groupSize: number | null;
   groupUnit: GroupSizeUnit;
+  velocityInput: string;
   poiNote: string;
   notes: string;
-  velocityInput: string;
 }
 
 interface PlannerForm {
-  powder: string;
-  bullet: string;
-  bulletWeightGr: number | null;
-  coal: string;
-  primer: string;
   distanceM: number | null;
   shotsPerStep: number | null;
   startChargeGr: number | null;
@@ -83,6 +78,18 @@ export class LoadDevTabComponent implements OnInit {
   entrySortMode: 'default' | 'chargeAsc' | 'groupAsc' | 'groupDesc' = 'default';
 
   resultsPanelOpen = false;
+  resultsCollapsed = false;
+
+  // Ladder wizard / velocity edit state
+  velocityEditEntry: LoadDevEntry | null = null;
+  velocityEditValue = '';
+
+  ladderWizardActive = false;
+  singleVelocityEditActive = false;
+  ladderWizardEntries: LoadDevEntry[] = [];
+  ladderWizardIndex = 0;
+
+  hasResultsForSelectedProject = false;
 
   constructor(private data: DataService) {}
 
@@ -121,19 +128,14 @@ export class LoadDevTabComponent implements OnInit {
       shotsFired: null,
       groupSize: null,
       groupUnit: 'MOA',
+      velocityInput: '',
       poiNote: '',
-      notes: '',
-      velocityInput: ''
+      notes: ''
     };
   }
 
   private createEmptyPlannerForm(): PlannerForm {
     return {
-      powder: '',
-      bullet: '',
-      bulletWeightGr: null,
-      coal: '',
-      primer: '',
       distanceM: null,
       shotsPerStep: null,
       startChargeGr: null,
@@ -142,7 +144,7 @@ export class LoadDevTabComponent implements OnInit {
     };
   }
 
-  private shortDate(value: string | Date | null | undefined): string {
+  shortDate(value: string | Date | null | undefined): string {
     if (!value) return '';
     const d = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(d.getTime())) return '';
@@ -151,6 +153,10 @@ export class LoadDevTabComponent implements OnInit {
       month: '2-digit',
       day: '2-digit'
     });
+  }
+
+  asDateString(value: string | Date | null | undefined): string {
+    return this.shortDate(value);
   }
 
   projectTypeLabel(type: LoadDevType): string {
@@ -162,12 +168,23 @@ export class LoadDevTabComponent implements OnInit {
       case 'groups':
         return 'Group comparison';
       default:
-        return String(type);
+        return 'Other';
     }
   }
 
-  asDateString(value: string | Date | null | undefined): string {
-    return this.shortDate(value);
+  getLadderSummary(project: LoadDevProject): string {
+    if (!project.entries || project.entries.length === 0) {
+      return 'No entries yet';
+    }
+    const charges = project.entries
+      .map(e => e.chargeGr)
+      .filter(v => v != null) as number[];
+    if (!charges.length) return `${project.entries.length} entries`;
+    const min = Math.min(...charges);
+    const max = Math.max(...charges);
+    return `${project.entries.length} entries • ${min.toFixed(
+      1
+    )}–${max.toFixed(1)} gr`;
   }
 
   // ---------------- rifles & projects ----------------
@@ -181,21 +198,52 @@ export class LoadDevTabComponent implements OnInit {
       this.projects = [];
       this.selectedProject = null;
       this.selectedProjectId = null;
-      this.updatePanelStates();
+      this.hasResultsForSelectedProject = false;
       return;
     }
 
     this.projects = this.data.getLoadDevProjectsForRifle(this.selectedRifleId);
-    if (this.selectedProjectId) {
-      this.selectedProject =
+    if (this.selectedProjectId != null) {
+      const found =
         this.projects.find(p => p.id === this.selectedProjectId) ?? null;
-    } else {
-      this.selectedProject = this.projects.length ? this.projects[0] : null;
-      this.selectedProjectId = this.selectedProject?.id ?? null;
+      this.selectedProject = found;
+      if (!found) {
+        this.selectedProjectId = null;
+      }
     }
 
-    this.resetPlannerForProject();
+    if (!this.selectedProject && this.projects.length > 0) {
+      this.selectedProject = this.projects[0];
+      this.selectedProjectId = this.selectedProject.id;
+    }
+
     this.updatePanelStates();
+    this.updateHasResultsFlag();
+  }
+
+  onProjectSelectChange(): void {
+    if (this.selectedProjectId == null) {
+      this.selectedProject = null;
+      this.updatePanelStates();
+      this.updateHasResultsFlag();
+      return;
+    }
+
+    const project =
+      this.projects.find(p => p.id === this.selectedProjectId) ?? null;
+    this.selectedProject = project;
+    this.updatePanelStates();
+    this.updateHasResultsFlag();
+  }
+
+  private updateHasResultsFlag(): void {
+    if (!this.selectedProject || !this.selectedProject.entries) {
+      this.hasResultsForSelectedProject = false;
+      return;
+    }
+    this.hasResultsForSelectedProject =
+      this.selectedProject.entries.length > 0 &&
+      this.selectedProject.entries.some(e => !!this.statsForEntry(e));
   }
 
   newProject(): void {
@@ -207,158 +255,66 @@ export class LoadDevTabComponent implements OnInit {
     this.projectForm = this.createEmptyProjectForm();
     this.projectForm.rifleId = this.selectedRifleId;
     this.projectForm.type = 'ladder';
-
-    // Auto-suggest a simple name: "<Rifle> Ladder test <date>"
-    const rifle = this.rifles.find(r => r.id === this.selectedRifleId);
-    const dateLabel = this.shortDate(new Date().toISOString());
-    if (rifle) {
-      this.projectForm.name = `${rifle.name} ${this.projectTypeLabel(
-        this.projectForm.type
-      )} ${dateLabel}`;
-    }
-
-    this.projectFormVisible = true;
-  }
-
-  editProject(project: LoadDevProject): void {
-    this.editingProject = project;
-    this.projectForm = {
-      rifleId: project.rifleId,
-      name: project.name,
-      type: project.type,
-      notes: project.notes ?? ''
-    };
     this.projectFormVisible = true;
   }
 
   cancelProjectForm(): void {
     this.projectFormVisible = false;
     this.editingProject = null;
+    this.projectForm = this.createEmptyProjectForm();
   }
 
   saveProject(): void {
-    if (this.projectForm.rifleId == null) {
-      alert('Please select a rifle for this project.');
+    if (!this.projectForm.rifleId || !this.projectForm.name.trim()) {
+      alert('Please select rifle and enter name.');
       return;
     }
-    if (!this.projectForm.name.trim()) {
-      alert('Please enter a project name.');
-      return;
-    }
-
-    const rifleId = this.projectForm.rifleId;
-    const name = this.projectForm.name.trim();
-    const type = this.projectForm.type;
-    const notes = this.projectForm.notes.trim() || undefined;
 
     if (this.editingProject) {
       const updated: LoadDevProject = {
         ...this.editingProject,
-        rifleId,
-        name,
-        type,
-        notes
+        rifleId: this.projectForm.rifleId,
+        name: this.projectForm.name.trim(),
+        type: this.projectForm.type,
+        notes: this.projectForm.notes.trim()
       };
       this.data.updateLoadDevProject(updated);
-      this.selectedProjectId = updated.id;
     } else {
-      const created = this.data.addLoadDevProject({
-        rifleId,
-        name,
-        type,
-        notes,
+      const newProject: LoadDevProject = {
+        id: Date.now(),
+        rifleId: this.projectForm.rifleId,
+        name: this.projectForm.name.trim(),
+        type: this.projectForm.type,
+        notes: this.projectForm.notes.trim() || undefined,
         dateStarted: new Date().toISOString(),
         entries: []
-      });
-      this.selectedProjectId = created.id;
+      } as LoadDevProject;
+      this.data.updateLoadDevProject(newProject);
     }
 
     this.projectFormVisible = false;
     this.editingProject = null;
+    this.projectForm = this.createEmptyProjectForm();
     this.loadProjects();
+    if (this.selectedProject) {
+      this.updatePanelStates();
+    }
   }
 
   deleteProject(project: LoadDevProject): void {
-    if (!confirm(`Delete load development project "${project.name}"?`)) {
-      return;
-    }
+    if (!confirm(`Delete project "${project.name}"?`)) return;
     this.data.deleteLoadDevProject(project.id);
     if (this.selectedProjectId === project.id) {
-      this.selectedProjectId = null;
       this.selectedProject = null;
+      this.selectedProjectId = null;
     }
     this.loadProjects();
   }
 
-  openProject(project: LoadDevProject): void {
-    this.selectedProjectId = project.id;
-    this.selectedProject = project;
-    this.resetPlannerForProject();
-    this.updatePanelStates();
-  }
-
-  // ---------------- planner ----------------
-
-  private resetPlannerForProject(): void {
-    const defaults: PlannerForm = this.createEmptyPlannerForm();
-
-    const p = this.selectedProject;
-    if (!p) {
-      this.planner = defaults;
-      return;
-    }
-
-    const entries = p.entries ?? [];
-    if (entries.length > 0) {
-      const last = entries[entries.length - 1];
-      defaults.powder = last.powder ?? '';
-      defaults.bullet = last.bullet ?? '';
-      defaults.bulletWeightGr = last.bulletWeightGr ?? null;
-      defaults.coal = last.coal ?? '';
-      defaults.primer = last.primer ?? '';
-      defaults.distanceM = last.distanceM ?? null;
-    }
-
-    if (entries.length >= 2) {
-      const charges = entries
-        .map(e => e.chargeGr ?? null)
-        .filter((v): v is number => v != null);
-
-      if (charges.length >= 2) {
-        charges.sort((a, b) => a - b);
-        defaults.startChargeGr = charges[0];
-        defaults.endChargeGr = charges[charges.length - 1];
-
-        if (charges.length >= 3) {
-          const diffs: number[] = [];
-          for (let i = 1; i < charges.length; i++) {
-            diffs.push(charges[i] - charges[i - 1]);
-          }
-          const avgDiff =
-            diffs.reduce((sum, v) => sum + v, 0) / Math.max(diffs.length, 1);
-          defaults.stepGr = Number(avgDiff.toFixed(2));
-        }
-      }
-    }
-
-    if (p.type === 'ocw') {
-      defaults.shotsPerStep = 3;
-    } else if (p.type === 'ladder') {
-      defaults.shotsPerStep = 1;
-    } else {
-      defaults.shotsPerStep = 3;
-    }
-
-    this.planner = defaults;
-  }
-
-  usePlannerDefaultsForExisting(): void {
-    this.resetPlannerForProject();
-  }
-
-  get isPlannerVisible(): boolean {
-    // Planner is useful for all test types (ladder, OCW, groups)
-    return !!this.selectedProject;
+  isAwaitingData(project: LoadDevProject): boolean {
+    // “Awaiting data” = entries created but no velocity stats yet
+    if (!project.entries || project.entries.length === 0) return false;
+    return project.entries.every(e => !this.statsForEntry(e));
   }
 
   private updatePanelStates(): void {
@@ -368,109 +324,123 @@ export class LoadDevTabComponent implements OnInit {
       return;
     }
     const hasEntries =
-      Array.isArray(this.selectedProject.entries) &&
-      this.selectedProject.entries.length > 0;
-
+      this.selectedProject.entries && this.selectedProject.entries.length > 0;
     this.resultsPanelOpen = hasEntries;
-    this.plannerPanelOpen = !hasEntries && this.isPlannerVisible;
   }
 
-  get hasResultsForSelectedProject(): boolean {
-    if (!this.selectedProject || !this.selectedProject.entries) return false;
-    return this.selectedProject.entries.some(e => this.hasResultData(e));
+  get isPlannerVisible(): boolean {
+    return !!this.selectedProject;
   }
 
-  private hasResultData(entry: LoadDevEntry): boolean {
-    if (!entry) return false;
-    const anyEntry = entry as any;
-    const raw = (anyEntry.velocityInput as string | undefined) ?? '';
-    const hasVelocities = raw.trim().length > 0;
-    const hasGroupSize = entry.groupSize != null && entry.groupSize > 0;
-    const hasShots = entry.shotsFired != null && entry.shotsFired > 0;
-    return hasVelocities || hasGroupSize || hasShots;
+  get isLadderWizardActive(): boolean {
+    return (
+      this.ladderWizardActive &&
+      !!this.selectedProject &&
+      this.selectedProject.type === 'ladder'
+    );
   }
 
-  isAwaitingData(project: LoadDevProject): boolean {
-    if (!project || !project.entries || project.entries.length === 0) {
-      return false;
-    }
-    return !project.entries.some(e => this.hasResultData(e));
-  }
-
-  generateSeriesFromPlanner(): void {
-    const project = this.selectedProject;
-    if (!project) return;
-
-    const {
-      powder,
-      bullet,
-      bulletWeightGr,
-      coal,
-      primer,
-      distanceM,
-      shotsPerStep,
-      startChargeGr,
-      endChargeGr,
-      stepGr
-    } = this.planner;
-
-    if (
-      startChargeGr == null ||
-      endChargeGr == null ||
-      stepGr == null ||
-      stepGr <= 0
-    ) {
-      alert('Please enter valid start, end and step charges.');
-      return;
-    }
-
-    if (endChargeGr < startChargeGr) {
-      alert('End charge must be greater than or equal to start charge.');
-      return;
-    }
-
-    const totalSteps = Math.floor((endChargeGr - startChargeGr) / stepGr) + 1;
-    if (totalSteps <= 0 || totalSteps > 60) {
-      alert('Please choose a reasonable number of steps (1–60).');
-      return;
-    }
-
-    const shots = shotsPerStep && shotsPerStep > 0 ? shotsPerStep : undefined;
-
-    for (let i = 0; i < totalSteps; i++) {
-      const charge = Number((startChargeGr + i * stepGr).toFixed(2));
-
-      const labelParts: string[] = [];
-      labelParts.push(`${charge} gr`);
-      if (powder.trim()) labelParts.push(powder.trim());
-      if (bulletWeightGr != null && bullet.trim()) {
-        labelParts.push(`${bulletWeightGr} gr ${bullet.trim()}`);
-      } else if (bullet.trim()) {
-        labelParts.push(bullet.trim());
-      }
-      const loadLabel = labelParts.join(' ');
-
-      const base: any = {
-        loadLabel,
-        powder: powder.trim() || undefined,
-        chargeGr: charge,
-        coal: coal.trim() || undefined,
-        primer: primer.trim() || undefined,
-        bullet: bullet.trim() || undefined,
-        bulletWeightGr: bulletWeightGr ?? undefined,
-        distanceM: distanceM ?? undefined,
-        shotsFired: shots ?? undefined
-      };
-
-      this.data.addLoadDevEntry(project.id, base);
-    }
-
-    this.loadProjects();
+  toggleResultsCollapsed(): void {
+    this.resultsCollapsed = !this.resultsCollapsed;
   }
 
   // ---------------- entries ----------------
 
-  get entriesForSelectedProject(): LoadDevEntry[] {
+  newEntry(): void {
+    if (!this.selectedProject) {
+      alert('Please create or select a load test first.');
+      return;
+    }
+    this.editingEntry = null;
+    this.entryFormVisible = true;
+    this.entryForm = this.createEmptyEntryForm();
+  }
+
+  editEntry(entry: LoadDevEntry): void {
+    this.editingEntry = entry;
+    this.entryFormVisible = true;
+
+    this.entryForm = {
+      loadLabel: entry.loadLabel ?? '',
+      powder: entry.powder ?? '',
+      chargeGr: entry.chargeGr ?? null,
+      coal: entry.coal ?? '',
+      primer: entry.primer ?? '',
+      bullet: entry.bullet ?? '',
+      bulletWeightGr: entry.bulletWeightGr ?? null,
+      bulletBc: entry.bulletBc ?? '',
+      distanceM: entry.distanceM ?? null,
+      shotsFired: entry.shotsFired ?? null,
+      groupSize: entry.groupSize ?? null,
+      groupUnit: entry.groupUnit ?? 'MOA',
+      velocityInput: (entry as any).velocityInput ?? '',
+      poiNote: entry.poiNote ?? '',
+      notes: entry.notes ?? ''
+    };
+  }
+
+  cancelEntryForm(): void {
+    this.entryFormVisible = false;
+    this.editingEntry = null;
+    this.entryForm = this.createEmptyEntryForm();
+  }
+
+  saveEntry(): void {
+    if (!this.selectedProject) return;
+
+    const form = this.entryForm;
+    const payload: Partial<LoadDevEntry> = {
+      loadLabel: form.loadLabel.trim() || undefined,
+      powder: form.powder.trim() || undefined,
+      chargeGr: form.chargeGr ?? undefined,
+      coal: form.coal.trim() || undefined,
+      primer: form.primer.trim() || undefined,
+      bullet: form.bullet.trim() || undefined,
+      bulletWeightGr: form.bulletWeightGr ?? undefined,
+      bulletBc: form.bulletBc.trim() || undefined,
+      distanceM: form.distanceM ?? undefined,
+      shotsFired: form.shotsFired ?? undefined,
+      groupSize: form.groupSize ?? undefined,
+      groupUnit: form.groupUnit ?? 'MOA',
+      poiNote: form.poiNote.trim() || undefined,
+      notes: form.notes.trim() || undefined
+    };
+
+    const anyPayload = payload as any;
+    anyPayload.velocityInput = form.velocityInput.trim() || undefined;
+
+    if (this.editingEntry) {
+      const updatedEntry: LoadDevEntry = {
+        ...this.editingEntry,
+        ...anyPayload
+      } as LoadDevEntry;
+      this.data.updateLoadDevEntry(this.selectedProject.id, updatedEntry);
+    } else {
+      const existing = this.selectedProject.entries ?? [];
+      const maxId = existing.length
+        ? Math.max(...existing.map(e => e.id ?? 0))
+        : 0;
+      const newEntry: LoadDevEntry = {
+        id: maxId + 1,
+        ...anyPayload
+      } as LoadDevEntry;
+      this.data.updateLoadDevEntry(this.selectedProject.id, newEntry);
+    }
+
+    this.entryFormVisible = false;
+    this.editingEntry = null;
+    this.entryForm = this.createEmptyEntryForm();
+    this.loadProjects();
+  }
+
+  deleteEntry(entry: LoadDevEntry): void {
+    if (!this.selectedProject) return;
+    if (!confirm('Delete this entry?')) return;
+    this.data.deleteLoadDevEntry(this.selectedProject.id, entry.id);
+    this.loadProjects();
+  }
+
+  entriesForSelectedProject(): LoadDevEntry[] {
     if (!this.selectedProject) return [];
     const list = [...this.selectedProject.entries];
 
@@ -498,214 +468,16 @@ export class LoadDevTabComponent implements OnInit {
     }
   }
 
-  newEntry(): void {
-    if (!this.selectedProject) return;
-    const project = this.selectedProject;
-
-    this.entryForm = this.createEmptyEntryForm();
-    this.editingEntry = null;
-
-    const entries = this.selectedProject.entries;
-    if (entries && entries.length > 0) {
-      const last = entries[entries.length - 1];
-      const anyLast = last as any;
-
-      this.entryForm.powder = last.powder ?? '';
-      this.entryForm.bullet = last.bullet ?? '';
-      this.entryForm.bulletWeightGr = last.bulletWeightGr ?? null;
-      this.entryForm.bulletBc = anyLast.bulletBc || '';   // ✅ carry BC forward
-      this.entryForm.coal = last.coal ?? '';
-      this.entryForm.primer = last.primer ?? '';
-      this.entryForm.distanceM = last.distanceM ?? null;
-      this.entryForm.shotsFired = last.shotsFired ?? null;
-      this.entryForm.groupUnit = (last.groupUnit ?? 'MOA') as GroupSizeUnit;
-    }
-
-    this.entryFormVisible = true;
-  }
-
-  editEntry(entry: LoadDevEntry): void {
-    if (!this.selectedProject) return;
-
-    const anyEntry = entry as any;
-
-    this.editingEntry = entry;
-    this.entryFormVisible = true;
-
-    this.entryForm.loadLabel = entry.loadLabel ?? '';
-    this.entryForm.powder = entry.powder ?? '';
-    this.entryForm.chargeGr = entry.chargeGr ?? null;
-    this.entryForm.coal = entry.coal ?? '';
-    this.entryForm.primer = entry.primer ?? '';
-    this.entryForm.bullet = entry.bullet ?? '';
-    this.entryForm.bulletWeightGr = entry.bulletWeightGr ?? null;
-    this.entryForm.bulletBc = anyEntry.bulletBc || '';
-    this.entryForm.distanceM = entry.distanceM ?? null;
-    this.entryForm.shotsFired = entry.shotsFired ?? null;
-    this.entryForm.groupSize = entry.groupSize ?? null;
-    this.entryForm.groupUnit = (entry.groupUnit ?? 'MOA') as GroupSizeUnit;
-    this.entryForm.poiNote = entry.poiNote ?? '';
-    this.entryForm.notes = entry.notes ?? '';
-    this.entryForm.velocityInput = anyEntry.velocityInput || '';
-  }
-
-  duplicateEntry(entry: LoadDevEntry): void {
-    if (!this.selectedProject) return;
-    const project = this.selectedProject;
-
-    const anyEntry = entry as any;
-
-    const clone: any = {
-      ...anyEntry,
-      id: undefined,
-      velocityInput: anyEntry.velocityInput || '',
-      createdAt: new Date().toISOString()
-    };
-    this.data.addLoadDevEntry(project.id, clone);
-    this.loadProjects();
-  }
-
-  deleteEntry(entry: LoadDevEntry): void {
-    if (!this.selectedProject) return;
-    if (!confirm('Delete this test entry?')) return;
-    this.data.deleteLoadDevEntry(this.selectedProject.id, entry.id);
-    this.loadProjects();
-  }
-
-  cancelEntryForm(): void {
-    this.entryFormVisible = false;
-    this.editingEntry = null;
-  }
-
-  saveEntry(): void {
-    if (!this.selectedProject) return;
-    const project = this.selectedProject;
-
-    const trimmedLabel = this.entryForm.loadLabel.trim();
-    if (!trimmedLabel) {
-      alert('Please enter a load label.');
-      return;
-    }
-
-    const anyForm = this.entryForm as any;
-
-    const base: any = {
-      loadLabel: trimmedLabel,
-      powder: this.entryForm.powder.trim() || undefined,
-      chargeGr: this.entryForm.chargeGr ?? undefined,
-      coal: this.entryForm.coal.trim() || undefined,
-      primer: this.entryForm.primer.trim() || undefined,
-      bullet: this.entryForm.bullet.trim() || undefined,
-      bulletWeightGr: this.entryForm.bulletWeightGr ?? undefined,
-      distanceM: this.entryForm.distanceM ?? undefined,
-      shotsFired: this.entryForm.shotsFired ?? undefined,
-      groupSize: this.entryForm.groupSize ?? undefined,
-      groupUnit: this.entryForm.groupUnit ?? 'MOA',
-      poiNote: this.entryForm.poiNote.trim() || undefined,
-      notes: this.entryForm.notes.trim() || undefined,
-      velocityInput: this.entryForm.velocityInput.trim() || undefined,
-      bulletBc: this.entryForm.bulletBc.trim() || undefined
-    };
-
-    if (this.editingEntry) {
-      const updated: LoadDevEntry = {
-        ...(this.editingEntry as any),
-        ...base
-      };
-      this.data.updateLoadDevEntry(project.id, updated);
-    } else {
-      this.data.addLoadDevEntry(project.id, base);
-    }
-
-    this.entryFormVisible = false;
-    this.editingEntry = null;
-    this.loadProjects();
-  }
-
-  // ---------------- entry summary & "best" ----------------
-
-  bestEntryForProject(p: LoadDevProject): LoadDevEntry | null {
-    if (!p.entries || p.entries.length === 0) return null;
-    const withGroup = p.entries.filter(e => e.groupSize != null);
-    if (withGroup.length === 0) return null;
-
-    let best: LoadDevEntry | null = null;
-    let bestGroup = Infinity;
-    let bestSd = Infinity;
-
-    for (const e of withGroup) {
-      const g = e.groupSize ?? Infinity;
-      const stats = this.statsForEntry(e);
-      const sd = stats?.sd ?? Infinity;
-
-      if (g < bestGroup || (g === bestGroup && sd < bestSd)) {
-        best = e;
-        bestGroup = g;
-        bestSd = sd;
-      }
-    }
-
-    return best;
-  }
-
-  get bestEntryForSelectedProject(): LoadDevEntry | null {
-    if (!this.selectedProject) return null;
-    return this.bestEntryForProject(this.selectedProject);
-  }
-
-  // ---------------- velocities & stats ----------------
-
-  get entryVelocityStats(): VelocityStats | null {
-    return this.computeVelocityStats(
-      this.parseVelocityInput(this.entryForm.velocityInput)
-    );
-  }
+  // ---------------- velocity parsing & stats ----------------
 
   private parseVelocityInput(raw: string | undefined | null): number[] {
     if (!raw) return [];
-    const tokens = raw
-      .split(/[\s,;]+/g)
-      .map(t => t.trim())
-      .filter(t => t.length > 0);
-
-    const values: number[] = [];
-    for (const token of tokens) {
-      const v = Number(token);
-      if (!Number.isNaN(v)) {
-        values.push(v);
-      }
-    }
-    return values;
-  }
-
-  private computeVelocityStats(values: number[]): VelocityStats | null {
-    if (!values || values.length < 2) return null;
-    const n = values.length;
-    const sum = values.reduce((acc, v) => acc + v, 0);
-    const avg = sum / n;
-
-    let min = values[0];
-    let max = values[0];
-    for (const v of values) {
-      if (v < min) min = v;
-      if (v > max) max = v;
-    }
-    const es = max - min;
-
-    let varianceSum = 0;
-    for (const v of values) {
-      const diff = v - avg;
-      varianceSum += diff * diff;
-    }
-    const variance = varianceSum / (n - 1);
-    const sd = Math.sqrt(variance);
-
-    return {
-      avg: Math.round(avg),
-      es: Math.round(es),
-      sd: Math.round(sd * 10) / 10,
-      n
-    };
+    return raw
+      .split(/[\s,;]+/)
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(str => Number(str))
+      .filter(v => Number.isFinite(v));
   }
 
   statsForEntry(entry: LoadDevEntry): VelocityStats | null {
@@ -713,5 +485,303 @@ export class LoadDevTabComponent implements OnInit {
     const raw = anyEntry.velocityInput as string | undefined;
     const values = this.parseVelocityInput(raw);
     return this.computeVelocityStats(values);
+  }
+
+  private computeVelocityStats(values: number[]): VelocityStats | null {
+    if (!values.length) return null;
+    const n = values.length;
+    const sorted = [...values].sort((a, b) => a - b);
+    const min = sorted[0];
+    const max = sorted[sorted.length - 1];
+    const avg = values.reduce((sum, v) => sum + v, 0) / n;
+    const es = max - min;
+
+    const variance =
+      values.reduce((sum, v) => sum + Math.pow(v - avg, 2), 0) / n;
+    const sd = Math.sqrt(variance);
+
+    return { avg, es, sd, n };
+  }
+
+  private computeSimpleSd(values: number[]): number {
+    if (!values.length) return 0;
+    const n = values.length;
+    const mean = values.reduce((sum, v) => sum + v, 0) / n;
+    const variance =
+      values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / n;
+    return Math.sqrt(variance);
+  }
+
+  // ---------------- ladder node detection ----------------
+
+  private computeNodesForSelectedProject(): Map<number, number> {
+    const map = new Map<number, number>();
+
+    if (!this.selectedProject || this.selectedProject.type !== 'ladder') {
+      return map;
+    }
+    if (!this.selectedProject.entries || this.selectedProject.entries.length < 3) {
+      return map;
+    }
+
+    const withStats = this.selectedProject.entries
+      .map(e => ({ entry: e, stats: this.statsForEntry(e) }))
+      .filter(x => !!x.stats) as { entry: LoadDevEntry; stats: VelocityStats }[];
+
+    if (withStats.length < 3) {
+      return map;
+    }
+
+    // Sort by charge for ladder order
+    const sorted = withStats.sort((a, b) => {
+      const aa = a.entry.chargeGr ?? Number.POSITIVE_INFINITY;
+      const bb = b.entry.chargeGr ?? Number.POSITIVE_INFINITY;
+      return aa - bb;
+    });
+
+    const n = sorted.length;
+    const nodeGroups: number[][] = [];
+
+    let i = 0;
+    while (i + 2 < n) {
+      let window = [sorted[i], sorted[i + 1], sorted[i + 2]];
+      let j = i + 3;
+
+      while (j < n) {
+        const extended = [...window, sorted[j]];
+        const velocities = extended.map(x => x.stats!.avg);
+        const sd = this.computeSimpleSd(velocities);
+        if (sd < 10) {
+          window = extended;
+          j++;
+        } else {
+          break;
+        }
+      }
+
+      const velocities = window.map(x => x.stats!.avg);
+      const sd = this.computeSimpleSd(velocities);
+      if (window.length >= 3 && sd < 10) {
+        nodeGroups.push(window.map(w => w.entry.id));
+        i = j;
+      } else {
+        i++;
+      }
+    }
+
+    nodeGroups.forEach((ids, nodeIndex) => {
+      ids.forEach(id => {
+        if (!map.has(id)) {
+          map.set(id, nodeIndex);
+        }
+      });
+    });
+
+    return map;
+  }
+
+  nodeCssClass(entry: LoadDevEntry): { [klass: string]: boolean } {
+    const nodes = this.computeNodesForSelectedProject();
+    const nodeIndex = nodes.get(entry.id);
+    return {
+      'bg-green-900/40': nodeIndex === 0,
+      'bg-orange-900/40': nodeIndex === 1,
+      'bg-red-900/40': nodeIndex === 2
+    };
+  }
+
+  // ---------------- best entry ----------------
+
+  bestEntryForProject(project: LoadDevProject): LoadDevEntry | null {
+    if (!project.entries || project.entries.length === 0) return null;
+
+    const withStats = project.entries
+      .map(e => ({ entry: e, stats: this.statsForEntry(e) }))
+      .filter(x => !!x.stats) as { entry: LoadDevEntry; stats: VelocityStats }[];
+
+    if (!withStats.length) return null;
+
+    withStats.sort((a, b) => {
+      if (!a.stats || !b.stats) return 0;
+      if (a.stats.sd !== b.stats.sd) return a.stats.sd - b.stats.sd;
+      return a.stats.es - b.stats.es;
+    });
+
+    return withStats[0].entry;
+  }
+
+  get bestEntryForSelectedProject(): LoadDevEntry | null {
+    return this.selectedProject
+      ? this.bestEntryForProject(this.selectedProject)
+      : null;
+  }
+
+  // ---------------- ladder planner ----------------
+
+  applyLadderPlan(): void {
+    if (!this.selectedProject) return;
+
+    const p = this.planner;
+    if (
+      p.startChargeGr == null ||
+      p.endChargeGr == null ||
+      p.stepGr == null ||
+      p.stepGr <= 0
+    ) {
+      alert('Please fill in valid start, end and step.');
+      return;
+    }
+
+    const [minCharge, maxCharge] = [p.startChargeGr, p.endChargeGr].sort(
+      (a, b) => a - b
+    );
+    const entries = this.selectedProject.entries ?? [];
+
+    const generated: LoadDevEntry[] = [];
+    for (
+      let charge = minCharge;
+      charge <= maxCharge + 1e-6;
+      charge += p.stepGr
+    ) {
+      const rounded = Number(charge.toFixed(2));
+      const existing = entries.find(e => e.chargeGr === rounded);
+      if (existing) {
+        generated.push(existing);
+      } else {
+        const anyPayload: any = {
+          chargeGr: rounded,
+          distanceM: p.distanceM ?? undefined,
+          shotsFired: p.shotsPerStep ?? undefined
+        };
+        this.data.updateLoadDevEntry(this.selectedProject.id, anyPayload);
+      }
+    }
+
+    this.loadProjects();
+  }
+
+  // ---------------- ladder wizard (velocity input) ----------------
+
+  startLadderWizard(): void {
+    if (!this.selectedProject || this.selectedProject.type !== 'ladder') {
+      alert('Ladder wizard is only available for Ladder tests.');
+      return;
+    }
+
+    const entries = [...(this.selectedProject.entries ?? [])].sort(
+      (a, b) => (a.chargeGr ?? 0) - (b.chargeGr ?? 0)
+    );
+
+    if (!entries.length) {
+      alert('Please create at least one ladder entry first.');
+      return;
+    }
+
+    this.ladderWizardEntries = entries;
+    this.ladderWizardIndex = 0;
+    this.ladderWizardActive = true;
+    this.singleVelocityEditActive = false;
+
+    this.setWizardCurrentEntry();
+  }
+
+  private setWizardCurrentEntry(): void {
+    if (
+      this.ladderWizardIndex < 0 ||
+      this.ladderWizardIndex >= this.ladderWizardEntries.length
+    ) {
+      this.finishLadderWizard();
+      return;
+    }
+
+    this.velocityEditEntry = this.ladderWizardEntries[this.ladderWizardIndex];
+    const anyEntry = this.velocityEditEntry as any;
+    this.velocityEditValue = anyEntry.velocityInput ?? '';
+  }
+
+  private finishLadderWizard(): void {
+    this.ladderWizardActive = false;
+    this.velocityEditEntry = null;
+    this.velocityEditValue = '';
+  }
+
+  saveVelocityAndNext(): void {
+    this.saveVelocityEdit();
+  }
+
+  skipVelocityAndNext(): void {
+    this.ladderWizardIndex++;
+    this.setWizardCurrentEntry();
+  }
+
+  cancelLadderWizard(): void {
+    this.finishLadderWizard();
+  }
+
+  /**
+   * Save current velocity and go to the next load.
+   * Empty / 0 / invalid => behave like Skip.
+   */
+  saveVelocityEdit(): void {
+    if (!this.selectedProject || !this.velocityEditEntry) return;
+
+    const trimmed = this.velocityEditValue.trim();
+    const v = Number(trimmed || '0');
+
+    // If the user leaves it empty/0/invalid, treat as skip
+    if (!Number.isFinite(v) || v <= 0) {
+      this.skipVelocityAndNext();
+      return;
+    }
+
+    const anyEntry = this.velocityEditEntry as any;
+    const existing = this.parseVelocityInput(anyEntry.velocityInput);
+    const updated = [...existing, v];
+    anyEntry.velocityInput = updated.join(' ');
+
+    this.data.updateLoadDevEntry(this.selectedProject.id, this.velocityEditEntry);
+
+    // Next in wizard
+    this.ladderWizardIndex++;
+    this.setWizardCurrentEntry();
+    this.updateHasResultsFlag();
+  }
+
+  // ---------------- single entry velocity edit (from table) ----------------
+
+  editVelocityForEntry(entry: LoadDevEntry): void {
+    this.ladderWizardActive = false;
+    this.singleVelocityEditActive = true;
+    this.velocityEditEntry = entry;
+    const anyEntry = entry as any;
+    this.velocityEditValue = anyEntry.velocityInput ?? '';
+  }
+
+  /**
+   * Save a single-entry velocity edit (non-wizard mode).
+   */
+  saveSingleVelocity(): void {
+    this.singleVelocityEditActive = false;
+    this.saveVelocityEdit();
+  }
+
+  /**
+   * Cancel a single-entry velocity edit (non-wizard mode).
+   */
+  cancelSingleVelocityEdit(): void {
+    this.singleVelocityEditActive = false;
+    this.cancelVelocityEdit();
+  }
+
+  /**
+   * Cancel wizard / panel.
+   */
+  cancelVelocityEdit(): void {
+    if (this.ladderWizardActive) {
+      this.finishLadderWizard();
+    } else {
+      this.velocityEditEntry = null;
+      this.velocityEditValue = '';
+    }
   }
 }

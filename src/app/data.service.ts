@@ -68,7 +68,7 @@ export class DataService {
     };
   }
 
-  private saveStore() {
+  private saveStore(): void {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.store));
     } catch {
@@ -82,6 +82,10 @@ export class DataService {
     return this.store.rifles;
   }
 
+  getRifleById(id: number): Rifle | undefined {
+    return this.store.rifles.find(r => r.id === id);
+  }
+
   addRifle(rifle: Omit<Rifle, 'id'>): Rifle {
     const newRifle: Rifle = {
       ...rifle,
@@ -92,7 +96,7 @@ export class DataService {
     return newRifle;
   }
 
-  updateRifle(rifle: Rifle) {
+  updateRifle(rifle: Rifle): void {
     const idx = this.store.rifles.findIndex(r => r.id === rifle.id);
     if (idx >= 0) {
       this.store.rifles[idx] = rifle;
@@ -100,14 +104,14 @@ export class DataService {
     }
   }
 
-  deleteRifle(id: number) {
+  deleteRifle(id: number): void {
     this.store.rifles = this.store.rifles.filter(r => r.id !== id);
     // NOTE: we do not automatically delete load dev projects or sessions.
     this.saveStore();
   }
 
   // Increment round count, never decreases
-  incrementRifleRoundCount(rifleId: number, delta: number) {
+  incrementRifleRoundCount(rifleId: number, delta: number): void {
     if (!delta || delta <= 0) return;
     const rifle = this.store.rifles.find(r => r.id === rifleId);
     if (!rifle) return;
@@ -135,7 +139,7 @@ export class DataService {
     return newVenue;
   }
 
-  updateVenue(venue: Venue) {
+  updateVenue(venue: Venue): void {
     const idx = this.store.venues.findIndex(v => v.id === venue.id);
     if (idx >= 0) {
       this.store.venues[idx] = venue;
@@ -143,7 +147,7 @@ export class DataService {
     }
   }
 
-  deleteVenue(id: number) {
+  deleteVenue(id: number): void {
     this.store.venues = this.store.venues.filter(v => v.id !== id);
     this.saveStore();
   }
@@ -152,6 +156,10 @@ export class DataService {
 
   getSessions(): Session[] {
     return this.store.sessions;
+  }
+
+  getSessionById(id: number): Session | undefined {
+    return this.store.sessions.find(s => s.id === id);
   }
 
   addSession(session: Omit<Session, 'id'>): Session {
@@ -164,7 +172,7 @@ export class DataService {
     return newSession;
   }
 
-  updateSession(session: Session) {
+  updateSession(session: Session): void {
     const idx = this.store.sessions.findIndex(s => s.id === session.id);
     if (idx >= 0) {
       this.store.sessions[idx] = session;
@@ -172,7 +180,7 @@ export class DataService {
     }
   }
 
-  deleteSession(id: number) {
+  deleteSession(id: number): void {
     this.store.sessions = this.store.sessions.filter(s => s.id !== id);
     this.saveStore();
   }
@@ -187,10 +195,12 @@ export class DataService {
     return this.store.loadDevProjects.find(p => p.id === id);
   }
 
-  addLoadDevProject(project: Omit<LoadDevProject, 'id' | 'dateStarted' | 'entries'> & {
-    dateStarted?: string;
-    entries?: LoadDevEntry[];
-  }): LoadDevProject {
+  addLoadDevProject(
+    project: Omit<LoadDevProject, 'id' | 'dateStarted' | 'entries'> & {
+      dateStarted?: string;
+      entries?: LoadDevEntry[];
+    }
+  ): LoadDevProject {
     const newProject: LoadDevProject = {
       id: this.store.nextLoadDevProjectId++,
       rifleId: project.rifleId,
@@ -205,28 +215,40 @@ export class DataService {
     return newProject;
   }
 
+  /**
+   * Upsert behaviour – updates an existing project or inserts it if missing.
+   * This keeps compatibility with places where a new project is created
+   * and then passed straight into updateLoadDevProject.
+   */
   updateLoadDevProject(project: LoadDevProject): void {
     const idx = this.store.loadDevProjects.findIndex(p => p.id === project.id);
     if (idx >= 0) {
       this.store.loadDevProjects[idx] = project;
-      this.saveStore();
+    } else {
+      this.store.loadDevProjects.push(project);
     }
+    this.saveStore();
   }
 
   deleteLoadDevProject(id: number): void {
-    this.store.loadDevProjects = this.store.loadDevProjects.filter(p => p.id !== id);
+    this.store.loadDevProjects = this.store.loadDevProjects.filter(
+      p => p.id !== id
+    );
     this.saveStore();
   }
 
   // ---------- Load Development Entries (inside projects) ----------
 
-  addLoadDevEntry(projectId: number, entry: Omit<LoadDevEntry, 'id'>): LoadDevEntry | null {
+  addLoadDevEntry(
+    projectId: number,
+    entry: Omit<LoadDevEntry, 'id'>
+  ): LoadDevEntry | null {
     const project = this.getLoadDevProjectById(projectId);
     if (!project) return null;
 
     const newEntry: LoadDevEntry = {
-      ...entry,
-      id: this.store.nextLoadDevEntryId++
+      id: this.store.nextLoadDevEntryId++,
+      ...entry
     };
 
     project.entries = [...(project.entries ?? []), newEntry];
@@ -234,22 +256,36 @@ export class DataService {
     return newEntry;
   }
 
+  /**
+   * Upsert an entry inside a project.
+   * - If the entry exists (matching id), it is updated.
+   * - If it does not exist, it is pushed as a new entry.
+   * This is critical for the ladder wizard + table to behave correctly.
+   */
   updateLoadDevEntry(projectId: number, entry: LoadDevEntry): void {
     const project = this.getLoadDevProjectById(projectId);
     if (!project) return;
 
-    const idx = project.entries.findIndex(e => e.id === entry.id);
-    if (idx >= 0) {
-      project.entries[idx] = entry;
-      this.updateLoadDevProject(project);
+    if (!project.entries) {
+      project.entries = [];
     }
+
+    const idx = project.entries.findIndex(e => e.id === entry.id);
+
+    if (idx >= 0) {
+      project.entries[idx] = { ...project.entries[idx], ...entry };
+    } else {
+      project.entries.push({ ...entry });
+    }
+
+    this.updateLoadDevProject(project);
   }
 
   deleteLoadDevEntry(projectId: number, entryId: number): void {
     const project = this.getLoadDevProjectById(projectId);
     if (!project) return;
 
-    project.entries = project.entries.filter(e => e.id !== entryId);
+    project.entries = (project.entries ?? []).filter(e => e.id !== entryId);
     this.updateLoadDevProject(project);
   }
 }

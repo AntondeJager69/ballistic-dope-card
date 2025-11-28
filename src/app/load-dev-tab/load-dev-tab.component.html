@@ -79,22 +79,14 @@
       </div>
     </div>
 
-    <!-- Header buttons: planner + results -->
+    <!-- Header buttons: ONLY ladder wizard + results toggle -->
     <div
       *ngIf="selectedProject"
       class="mt-3 flex items-center justify-between gap-3"
     >
       <div class="flex items-center gap-2 text-[11px]">
         <button
-          type="button"
-          class="px-3 py-1.5 rounded-2xl bg-gray-800 text-gray-100 border border-gray-700"
-          (click)="plannerPanelOpen = !plannerPanelOpen"
-        >
-          {{ plannerPanelOpen ? 'Hide planner' : 'Plan ladder' }}
-        </button>
-
-        <button
-          *ngIf="selectedProject?.type === 'ladder'"
+          *ngIf="selectedProject && selectedProject.type === 'ladder'"
           type="button"
           class="px-3 py-1.5 rounded-2xl bg-amber-500 text-black font-semibold"
           (click)="startLadderWizard()"
@@ -111,73 +103,6 @@
           (click)="toggleResultsCollapsed()"
         >
           {{ resultsCollapsed ? 'Show results' : 'Hide results' }}
-        </button>
-      </div>
-    </div>
-
-    <!-- Planner panel -->
-    <div
-      *ngIf="plannerPanelOpen && isPlannerVisible"
-      class="mt-3 border border-gray-800 bg-black/70 rounded-2xl p-3 space-y-2"
-    >
-      <div class="text-[11px] text-gray-200 mb-1">
-        Ladder planner
-      </div>
-
-      <div class="grid grid-cols-2 gap-2 text-[11px]">
-        <div>
-          <label class="block text-gray-400 mb-0.5">Distance (m)</label>
-          <input
-            type="number"
-            class="w-full bg-black/60 border border-gray-700 rounded-2xl px-2 py-1 text-xs text-gray-100"
-            [(ngModel)]="planner.distanceM"
-          />
-        </div>
-
-        <div>
-          <label class="block text-gray-400 mb-0.5">Shots per step</label>
-          <input
-            type="number"
-            class="w-full bg-black/60 border border-gray-700 rounded-2xl px-2 py-1 text-xs text-gray-100"
-            [(ngModel)]="planner.shotsPerStep"
-          />
-        </div>
-
-        <div>
-          <label class="block text-gray-400 mb-0.5">Start charge (gr)</label>
-          <input
-            type="number"
-            class="w-full bg-black/60 border border-gray-700 rounded-2xl px-2 py-1 text-xs text-gray-100"
-            [(ngModel)]="planner.startChargeGr"
-          />
-        </div>
-
-        <div>
-          <label class="block text-gray-400 mb-0.5">End charge (gr)</label>
-          <input
-            type="number"
-            class="w-full bg-black/60 border border-gray-700 rounded-2xl px-2 py-1 text-xs text-gray-100"
-            [(ngModel)]="planner.endChargeGr"
-          />
-        </div>
-
-        <div>
-          <label class="block text-gray-400 mb-0.5">Step (gr)</label>
-          <input
-            type="number"
-            class="w-full bg-black/60 border border-gray-700 rounded-2xl px-2 py-1 text-xs text-gray-100"
-            [(ngModel)]="planner.stepGr"
-          />
-        </div>
-      </div>
-
-      <div class="flex justify-end mt-2 text-[11px]">
-        <button
-          type="button"
-          class="px-3 py-1.5 rounded-2xl bg-emerald-500 text-black font-semibold"
-          (click)="applyLadderPlan()"
-        >
-          Apply to entries
         </button>
       </div>
     </div>
@@ -309,9 +234,6 @@
               <td class="px-2 py-1 align-middle">
                 <ng-container *ngIf="statsForEntry(entry) as s; else noVelocity">
                   {{ s.avg | number: '1.0-0' }}
-                  <span class="ml-1 text-[10px] text-gray-300">
-                    ({{ s.n }})
-                  </span>
                 </ng-container>
                 <ng-template #noVelocity>
                   <span class="text-gray-500">—</span>

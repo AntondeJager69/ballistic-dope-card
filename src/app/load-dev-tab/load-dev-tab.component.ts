@@ -217,14 +217,20 @@ export class LoadDevTabComponent implements OnInit {
       this.selectedProjectId = this.selectedProject.id;
     }
 
-    this.updatePanelStates();
+    this.updateHasResultsFlag();
+  }
+
+  private refreshSelectedProject(): void {
+    if (this.selectedRifleId == null || this.selectedProjectId == null) return;
+    this.projects = this.data.getLoadDevProjectsForRifle(this.selectedRifleId);
+    this.selectedProject =
+      this.projects.find(p => p.id === this.selectedProjectId) ?? null;
     this.updateHasResultsFlag();
   }
 
   onProjectSelectChange(): void {
     if (this.selectedProjectId == null) {
       this.selectedProject = null;
-      this.updatePanelStates();
       this.updateHasResultsFlag();
       return;
     }
@@ -232,7 +238,6 @@ export class LoadDevTabComponent implements OnInit {
     const project =
       this.projects.find(p => p.id === this.selectedProjectId) ?? null;
     this.selectedProject = project;
-    this.updatePanelStates();
     this.updateHasResultsFlag();
   }
 
@@ -245,6 +250,12 @@ export class LoadDevTabComponent implements OnInit {
       this.selectedProject.entries.length > 0 &&
       this.selectedProject.entries.some(e => !!this.statsForEntry(e));
   }
+
+  // <-- this is the missing method that fixes your template error
+  toggleResultsCollapsed(): void {
+    this.resultsCollapsed = !this.resultsCollapsed;
+  }
+  // --->
 
   newProject(): void {
     if (this.selectedRifleId == null) {
@@ -296,9 +307,6 @@ export class LoadDevTabComponent implements OnInit {
     this.editingProject = null;
     this.projectForm = this.createEmptyProjectForm();
     this.loadProjects();
-    if (this.selectedProject) {
-      this.updatePanelStates();
-    }
   }
 
   deleteProject(project: LoadDevProject): void {
@@ -309,39 +317,6 @@ export class LoadDevTabComponent implements OnInit {
       this.selectedProjectId = null;
     }
     this.loadProjects();
-  }
-
-  isAwaitingData(project: LoadDevProject): boolean {
-    // “Awaiting data” = entries created but no velocity stats yet
-    if (!project.entries || project.entries.length === 0) return false;
-    return project.entries.every(e => !this.statsForEntry(e));
-  }
-
-  private updatePanelStates(): void {
-    if (!this.selectedProject) {
-      this.resultsPanelOpen = false;
-      this.plannerPanelOpen = false;
-      return;
-    }
-    const hasEntries =
-      this.selectedProject.entries && this.selectedProject.entries.length > 0;
-    this.resultsPanelOpen = hasEntries;
-  }
-
-  get isPlannerVisible(): boolean {
-    return !!this.selectedProject;
-  }
-
-  get isLadderWizardActive(): boolean {
-    return (
-      this.ladderWizardActive &&
-      !!this.selectedProject &&
-      this.selectedProject.type === 'ladder'
-    );
-  }
-
-  toggleResultsCollapsed(): void {
-    this.resultsCollapsed = !this.resultsCollapsed;
   }
 
   // ---------------- entries ----------------
@@ -616,50 +591,6 @@ export class LoadDevTabComponent implements OnInit {
       : null;
   }
 
-  // ---------------- ladder planner ----------------
-
-  applyLadderPlan(): void {
-    if (!this.selectedProject) return;
-
-    const p = this.planner;
-    if (
-      p.startChargeGr == null ||
-      p.endChargeGr == null ||
-      p.stepGr == null ||
-      p.stepGr <= 0
-    ) {
-      alert('Please fill in valid start, end and step.');
-      return;
-    }
-
-    const [minCharge, maxCharge] = [p.startChargeGr, p.endChargeGr].sort(
-      (a, b) => a - b
-    );
-    const entries = this.selectedProject.entries ?? [];
-
-    const generated: LoadDevEntry[] = [];
-    for (
-      let charge = minCharge;
-      charge <= maxCharge + 1e-6;
-      charge += p.stepGr
-    ) {
-      const rounded = Number(charge.toFixed(2));
-      const existing = entries.find(e => e.chargeGr === rounded);
-      if (existing) {
-        generated.push(existing);
-      } else {
-        const anyPayload: any = {
-          chargeGr: rounded,
-          distanceM: p.distanceM ?? undefined,
-          shotsFired: p.shotsPerStep ?? undefined
-        };
-        this.data.updateLoadDevEntry(this.selectedProject.id, anyPayload);
-      }
-    }
-
-    this.loadProjects();
-  }
-
   // ---------------- ladder wizard (velocity input) ----------------
 
   startLadderWizard(): void {
@@ -705,8 +636,38 @@ export class LoadDevTabComponent implements OnInit {
     this.velocityEditValue = '';
   }
 
+  /**
+   * Save current velocity and move to the next step.
+   * If value is empty -> just skip without saving.
+   */
   saveVelocityAndNext(): void {
-    this.saveVelocityEdit();
+    if (!this.selectedProject || !this.velocityEditEntry) return;
+
+    const trimmed = this.velocityEditValue.trim();
+
+    // Empty -> skip without saving
+    if (!trimmed) {
+      this.ladderWizardIndex++;
+      this.setWizardCurrentEntry();
+      return;
+    }
+
+    const v = Number(trimmed);
+    if (!Number.isFinite(v) || v <= 0) {
+      alert('Velocity must be a positive number.');
+      return;
+    }
+
+    const entry = this.velocityEditEntry;
+    const anyEntry = entry as any;
+    // Overwrite with single latest velocity value
+    anyEntry.velocityInput = String(v);
+
+    this.data.updateLoadDevEntry(this.selectedProject.id, entry);
+    this.refreshSelectedProject();
+
+    this.ladderWizardIndex++;
+    this.setWizardCurrentEntry();
   }
 
   skipVelocityAndNext(): void {
@@ -716,35 +677,6 @@ export class LoadDevTabComponent implements OnInit {
 
   cancelLadderWizard(): void {
     this.finishLadderWizard();
-  }
-
-  /**
-   * Save current velocity and go to the next load.
-   * Empty / 0 / invalid => behave like Skip.
-   */
-  saveVelocityEdit(): void {
-    if (!this.selectedProject || !this.velocityEditEntry) return;
-
-    const trimmed = this.velocityEditValue.trim();
-    const v = Number(trimmed || '0');
-
-    // If the user leaves it empty/0/invalid, treat as skip
-    if (!Number.isFinite(v) || v <= 0) {
-      this.skipVelocityAndNext();
-      return;
-    }
-
-    const anyEntry = this.velocityEditEntry as any;
-    const existing = this.parseVelocityInput(anyEntry.velocityInput);
-    const updated = [...existing, v];
-    anyEntry.velocityInput = updated.join(' ');
-
-    this.data.updateLoadDevEntry(this.selectedProject.id, this.velocityEditEntry);
-
-    // Next in wizard
-    this.ladderWizardIndex++;
-    this.setWizardCurrentEntry();
-    this.updateHasResultsFlag();
   }
 
   // ---------------- single entry velocity edit (from table) ----------------
@@ -758,16 +690,37 @@ export class LoadDevTabComponent implements OnInit {
   }
 
   /**
-   * Save a single-entry velocity edit (non-wizard mode).
+   * Save velocity from single-row edit (table).
    */
   saveSingleVelocity(): void {
+    if (!this.selectedProject || !this.velocityEditEntry) {
+      this.singleVelocityEditActive = false;
+      return;
+    }
+
+    const trimmed = this.velocityEditValue.trim();
+    if (!trimmed) {
+      this.singleVelocityEditActive = false;
+      this.cancelVelocityEdit();
+      return;
+    }
+
+    const v = Number(trimmed);
+    if (!Number.isFinite(v) || v <= 0) {
+      alert('Velocity must be a positive number.');
+      return;
+    }
+
+    const entry = this.velocityEditEntry;
+    (entry as any).velocityInput = String(v);
+
+    this.data.updateLoadDevEntry(this.selectedProject.id, entry);
+    this.refreshSelectedProject();
+
     this.singleVelocityEditActive = false;
-    this.saveVelocityEdit();
+    this.cancelVelocityEdit();
   }
 
-  /**
-   * Cancel a single-entry velocity edit (non-wizard mode).
-   */
   cancelSingleVelocityEdit(): void {
     this.singleVelocityEditActive = false;
     this.cancelVelocityEdit();

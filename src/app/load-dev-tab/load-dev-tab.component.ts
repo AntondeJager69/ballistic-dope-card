@@ -85,7 +85,7 @@ export class LoadDevTabComponent implements OnInit {
   entryForm: EntryForm = this.createEmptyEntryForm();
   entrySortMode: 'default' | 'chargeAsc' | 'groupAsc' | 'groupDesc' = 'default';
 
-  // Results
+  // Results visibility
   resultsCollapsed = false;
   hasResultsForSelectedProject = false;
 
@@ -94,7 +94,7 @@ export class LoadDevTabComponent implements OnInit {
   ladderWizardEntries: LoadDevEntry[] = [];
   ladderWizardIndex = 0;
   velocityEditEntry: LoadDevEntry | null = null;
-  velocityEditValue = '';
+  velocityEditValue: string | number = '';
 
   // Single-row velocity edit
   singleVelocityEditActive = false;
@@ -111,7 +111,7 @@ export class LoadDevTabComponent implements OnInit {
     }
   }
 
-  // ---------- helpers ----------
+  // ---------- basic helpers ----------
 
   private createEmptyProjectForm(): ProjectForm {
     return {
@@ -180,7 +180,7 @@ export class LoadDevTabComponent implements OnInit {
     }
   }
 
-  // ---------- rifles & projects ----------
+  // ---------- rifle / project loading ----------
 
   onRifleChange(): void {
     this.loadProjects();
@@ -231,7 +231,6 @@ export class LoadDevTabComponent implements OnInit {
   }
 
   private updateHasResultsFlag(): void {
-    // “Has results” = there are entries, even if they don't have velocities yet
     this.hasResultsForSelectedProject =
       !!this.selectedProject &&
       !!this.selectedProject.entries &&
@@ -294,10 +293,9 @@ export class LoadDevTabComponent implements OnInit {
     while (charge <= endChargeGr + 1e-6) {
       const roundedCharge = Number(charge.toFixed(2));
 
-      // Use updateLoadDevEntry so DataService can create if not present
       const entry: LoadDevEntry = {
         id: localId++,
-        loadLabel: '', // string, not undefined
+        loadLabel: '',
         powder: undefined,
         chargeGr: roundedCharge,
         coal: undefined,
@@ -336,7 +334,6 @@ export class LoadDevTabComponent implements OnInit {
       this.data.updateLoadDevProject(updated);
       this.selectedProjectId = updated.id;
     } else {
-      // Create project directly with updateLoadDevProject, DataService will store it
       const newProject: LoadDevProject = {
         id: Date.now(),
         rifleId: this.projectForm.rifleId,
@@ -349,7 +346,7 @@ export class LoadDevTabComponent implements OnInit {
       this.data.updateLoadDevProject(newProject);
       this.selectedProjectId = newProject.id;
 
-      // Then auto-create ladder entries
+      // auto-create ladder entries from planner
       this.createLadderEntriesFromPlanner(newProject.id);
     }
 
@@ -483,7 +480,7 @@ export class LoadDevTabComponent implements OnInit {
     }
   }
 
-  // ---------- velocity stats ----------
+  // ---------- velocity stats & parsing ----------
 
   private parseVelocityInput(raw: string | undefined | null): number[] {
     if (!raw) return [];
@@ -522,7 +519,7 @@ export class LoadDevTabComponent implements OnInit {
     return Math.sqrt(variance);
   }
 
-  // ---------- node detection ----------
+  // ---------- node detection & colouring ----------
 
   private computeNodesForSelectedProject(): Map<number, number> {
     const map = new Map<number, number>();
@@ -588,11 +585,32 @@ export class LoadDevTabComponent implements OnInit {
     };
   }
 
+  // ---------- helper: are all entries populated with velocity? ----------
+
+  allEntriesHaveVelocity(): boolean {
+    if (!this.selectedProject || !this.selectedProject.entries?.length) {
+      return false;
+    }
+
+    return this.selectedProject.entries.every(e => {
+      const any = e as any;
+      const values = this.parseVelocityInput(any.velocityInput);
+      return values.length > 0;
+    });
+  }
+
   // ---------- ladder wizard ----------
 
   startLadderWizard(): void {
     if (!this.selectedProject || this.selectedProject.type !== 'ladder') {
       alert('This is not a ladder test');
+      return;
+    }
+
+    if (this.allEntriesHaveVelocity()) {
+      alert(
+        'All ladder steps already have velocities. Use the Edit buttons for changes.'
+      );
       return;
     }
 
@@ -660,34 +678,32 @@ export class LoadDevTabComponent implements OnInit {
     this.velocityEditValue = any.velocityInput ?? '';
   }
 
- saveVelocityAndNext(): void {
-  if (!this.selectedProject || !this.velocityEditEntry) return;
+  saveVelocityAndNext(): void {
+    if (!this.selectedProject || !this.velocityEditEntry) return;
 
-  const raw = this.velocityEditValue ?? '';
-  const trimmed = raw.toString().trim();   // <-- safe for number or string
+    const raw = this.velocityEditValue ?? '';
+    const trimmed = raw.toString().trim();
 
-  if (trimmed) {
-    const v = Number(trimmed);
-    if (Number.isFinite(v) && v > 0) {
-      const entry = this.velocityEditEntry;
-      const any = entry as any;
-      const existing = this.parseVelocityInput(any.velocityInput);
-      const updated = [...existing, v];
-      any.velocityInput = updated.join(' ');
-      entry.shotsFired = updated.length;
+    if (trimmed) {
+      const v = Number(trimmed);
+      if (Number.isFinite(v) && v > 0) {
+        const entry = this.velocityEditEntry;
+        const any = entry as any;
+        const existing = this.parseVelocityInput(any.velocityInput);
+        const updated = [...existing, v];
+        any.velocityInput = updated.join(' ');
+        entry.shotsFired = updated.length;
 
-      this.data.updateLoadDevEntry(this.selectedProject.id, entry);
-      this.refreshSelectedProject();
-    } else {
-      alert('Invalid velocity');
-      return;
+        this.data.updateLoadDevEntry(this.selectedProject.id, entry);
+        this.refreshSelectedProject();
+      } else {
+        alert('Invalid velocity');
+        return;
+      }
     }
-  } else {
-    // empty -> nothing to save, just move on
-  }
 
-  this.goToNextWizardEntry();
-}
+    this.goToNextWizardEntry();
+  }
 
   skipVelocityAndNext(): void {
     this.goToNextWizardEntry();
@@ -708,46 +724,46 @@ export class LoadDevTabComponent implements OnInit {
   }
 
   saveSingleVelocity(): void {
-  if (!this.selectedProject || !this.velocityEditEntry) {
-    this.singleVelocityEditActive = false;
-    return;
-  }
+    if (!this.selectedProject || !this.velocityEditEntry) {
+      this.singleVelocityEditActive = false;
+      return;
+    }
 
-  const raw = this.velocityEditValue ?? '';
-  const trimmed = raw.toString().trim();   // <-- safe for number or string
+    const raw = this.velocityEditValue ?? '';
+    const trimmed = raw.toString().trim();
 
-  if (!trimmed) {
+    if (!trimmed) {
+      this.singleVelocityEditActive = false;
+      this.cancelVelocityEdit();
+      return;
+    }
+
+    const v = Number(trimmed);
+    if (!Number.isFinite(v) || v <= 0) {
+      alert('Invalid velocity');
+      return;
+    }
+
+    const entry = this.velocityEditEntry;
+    const any = entry as any;
+    const existing = this.parseVelocityInput(any.velocityInput);
+    const updated = [...existing, v];
+    any.velocityInput = updated.join(' ');
+    entry.shotsFired = updated.length;
+
+    this.data.updateLoadDevEntry(this.selectedProject.id, entry);
+    this.refreshSelectedProject();
+
     this.singleVelocityEditActive = false;
     this.cancelVelocityEdit();
-    return;
   }
-
-  const v = Number(trimmed);
-  if (!Number.isFinite(v) || v <= 0) {
-    alert('Invalid velocity');
-    return;
-  }
-
-  const entry = this.velocityEditEntry;
-  const any = entry as any;
-  const existing = this.parseVelocityInput(any.velocityInput);
-  const updated = [...existing, v];
-  any.velocityInput = updated.join(' ');
-  entry.shotsFired = updated.length;
-
-  this.data.updateLoadDevEntry(this.selectedProject.id, entry);
-  this.refreshSelectedProject();
-
-  this.singleVelocityEditActive = false;
-  this.cancelVelocityEdit();
-}
 
   cancelSingleVelocityEdit(): void {
     this.singleVelocityEditActive = false;
     this.cancelVelocityEdit();
   }
 
-  cancelVelocityEdit(): void {
+  private cancelVelocityEdit(): void {
     if (this.ladderWizardActive) {
       this.finishLadderWizard();
     } else {

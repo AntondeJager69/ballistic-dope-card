@@ -591,15 +591,27 @@ export class LoadDevTabComponent implements OnInit {
     return map;
   }
 
-  nodeCssClass(entry: LoadDevEntry) {
-    const map = this.computeNodesForSelectedProject();
-    const idx = map.get(entry.id);
-    return {
-      'bg-green-900/40': idx === 0,
-      'bg-orange-900/40': idx === 1,
-      'bg-red-900/40': idx === 2
-    };
-  }
+nodeCssClass(entry: LoadDevEntry) {
+  const map = this.computeNodesForSelectedProject();
+  const idx = map.get(entry.id);
+
+  return {
+    // PRIMARY NODE – ultra neon green + glowing outline
+    'bg-black text-white ring-4 ring-[#00ff00] shadow-[0_0_12px_#00ff00]':
+      idx === 0,
+
+    // SECOND NODE – ultra neon orange + glowing outline
+    'bg-black text-white ring-4 ring-[#ff9900] shadow-[0_0_12px_#ff9900]':
+      idx === 1,
+
+    // THIRD NODE – ultra neon red + glowing outline
+    'bg-black text-white ring-4 ring-[#ff0000] shadow-[0_0_12px_#ff0000]':
+      idx === 2
+  };
+}
+
+
+
 
   // ---------- helper: are all entries populated with velocity? ----------
 
@@ -861,4 +873,29 @@ export class LoadDevTabComponent implements OnInit {
       this.velocityEditValue = '';
     }
   }
+  onBackFromLoadDev(): void {
+  // Clear selection and collapse any open panels
+  this.selectedProjectId = null;
+  this.selectedProject = null;
+  this.projectFormVisible = false;
+  this.editingProject = null;
+
+  this.entryFormVisible = false;
+  this.editingEntry = null;
+
+  this.hasResultsForSelectedProject = false;
+  this.resultsCollapsed = false;
+  this.showGraph = false;
+  this.graphCoords = [];
+  this.graphSvgPoints = '';
+
+  this.singleVelocityEditActive = false;
+  this.velocityEditEntry = null;
+  this.velocityEditValue = '';
+
+  this.ladderWizardActive = false;
+  this.ladderWizardEntries = [];
+  this.ladderWizardIndex = 0;
+}
+
 }

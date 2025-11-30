@@ -185,6 +185,35 @@ export class DataService {
     this.saveStore();
   }
 
+  /**
+   * Convenience helper – create a "pending" History session
+   * for a load development project. This shows up in History
+   * (yellow row when `completed === false`) so the shooter can
+   * later enter velocities with the step wizard.
+   */
+
+ createSessionForLoadDevProject(project: LoadDevProject): Session {
+  const title = project.name?.trim()
+    ? `Load dev: ${project.name.trim()}`
+    : 'Load development ladder';
+
+  const session: Omit<Session, 'id'> = {
+    date: new Date().toISOString(),
+    rifleId: project.rifleId,
+    venueId: 0,  // ✅ satisfies `number` type
+    title,
+    environment: {},
+    dope: [],
+    notes:
+      'Load development ladder – after shooting, enter your actual velocities using the step wizard.',
+    completed: false
+  };
+
+  return this.addSession(session);
+}
+
+
+
   // ---------- Load Development Projects ----------
 
   getLoadDevProjectsForRifle(rifleId: number): LoadDevProject[] {

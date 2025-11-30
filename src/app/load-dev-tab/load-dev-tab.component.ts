@@ -13,8 +13,15 @@ import {
 interface ProjectForm {
   rifleId: number | null;
   name: string;
-  type: LoadDevType;
+  type: LoadDevType | null;
   notes: string;
+
+  powder: string;
+  bullet: string;
+  bulletWeightGr: number | null;
+  brass: string;
+  oal: number | null;
+  distanceM: number | null;
 }
 
 interface EntryForm {
@@ -37,7 +44,6 @@ interface EntryForm {
 
 interface PlannerForm {
   distanceM: number | null;
-  shotsPerStep: number | null;
   startChargeGr: number | null;
   endChargeGr: number | null;
   stepGr: number | null;
@@ -76,6 +82,9 @@ export class LoadDevTabComponent implements OnInit {
   editingProject: LoadDevProject | null = null;
   projectForm: ProjectForm = this.createEmptyProjectForm();
 
+  // Notes panel toggle for project form
+  showNotesPanel = false;
+
   // Ladder planner
   planner: PlannerForm = this.createEmptyPlannerForm();
 
@@ -88,6 +97,9 @@ export class LoadDevTabComponent implements OnInit {
   // Results visibility
   resultsCollapsed = false;
   hasResultsForSelectedProject = false;
+
+  // Post-save yellow banner message
+  postSaveMessage: string | null = null;
 
   // Ladder wizard
   ladderWizardActive = false;
@@ -124,8 +136,14 @@ export class LoadDevTabComponent implements OnInit {
     return {
       rifleId: null,
       name: '',
-      type: 'ladder',
-      notes: ''
+      type: null,
+      notes: '',
+      powder: '',
+      bullet: '',
+      bulletWeightGr: null,
+      brass: '',
+      oal: null,
+      distanceM: null
     };
   }
 
@@ -152,7 +170,6 @@ export class LoadDevTabComponent implements OnInit {
   private createEmptyPlannerForm(): PlannerForm {
     return {
       distanceM: null,
-      shotsPerStep: null,
       startChargeGr: null,
       endChargeGr: null,
       stepGr: null
@@ -177,7 +194,7 @@ export class LoadDevTabComponent implements OnInit {
   projectTypeLabel(type: LoadDevType): string {
     switch (type) {
       case 'ladder':
-        return 'Ladder test';
+        return 'Ladder';
       case 'ocw':
         return 'OCW';
       case 'groups':
@@ -187,39 +204,117 @@ export class LoadDevTabComponent implements OnInit {
     }
   }
 
+  /** Rifle name for display in the form (we already selected rifle at top) */
+  getSelectedRifleName(): string {
+    if (!this.selectedRifleId) {
+      return 'No rifle selected';
+    }
+
+    const rifle = this.rifles.find(r => r.id === this.selectedRifleId);
+    if (rifle && rifle.name) {
+      return rifle.name;
+    }
+
+    return 'Rifle ' + this.selectedRifleId;
+  }
+
+  /** Suggested project name based on rifle, type, powder, bullet etc. */
+  getSuggestedProjectName(): string {
+    const rifleName =
+      this.rifles.find(r => r.id === this.selectedRifleId)?.name || 'Load';
+    const typeLabel =
+      this.projectForm.type === 'ladder'
+        ? 'Ladder'
+        : this.projectForm.type === 'ocw'
+        ? 'OCW'
+        : 'Dev';
+
+    const powder = this.projectForm.powder?.trim()
+      ? ` ${this.projectForm.powder.trim()}`
+      : '';
+    const bulletPart =
+      this.projectForm.bulletWeightGr && this.projectForm.bullet?.trim()
+        ? ` ${this.projectForm.bulletWeightGr}gr ${this.projectForm.bullet.trim()}`
+        : '';
+
+    return `${rifleName} ${typeLabel}${powder}${bulletPart}`.trim();
+  }
+
+  /** Detailed description text under the "Choose development type" field */
+  get devTypeDescription(): string | null {
+    switch (this.projectForm.type) {
+      case 'ladder':
+        return 'Ladder test: single shots with small powder charge steps. You look for a “flat spot” in velocity (low SD/ES) across 3 or more neighbouring charges – that usually indicates a stable node.';
+      case 'ocw':
+        return 'OCW (Optimal Charge Weight): 3–5 shot groups over a small charge window. You look for a range of charges where point of impact stays very similar while groups remain tight – that indicates a forgiving accuracy node.';
+      default:
+        return null;
+    }
+  }
+
+  toggleNotesPanel(): void {
+    this.showNotesPanel = !this.showNotesPanel;
+  }
+
   // ---------- rifle / project loading ----------
 
-  onRifleChange(): void {
-    this.loadProjects();
+ onRifleChange(): void {
+  // When rifle changes, clear any selected project so user must choose / create one
+  this.selectedProjectId = null;
+  this.selectedProject = null;
+  this.hasResultsForSelectedProject = false;
+  this.resultsCollapsed = false;
+  this.showGraph = false;
+  this.graphCoords = [];
+  this.graphSvgPoints = '';
+
+  this.loadProjects();
+}
+
+
+  private resetWizard(): void {
+    this.showGraph = false;
   }
 
   private loadProjects(): void {
-    if (this.selectedRifleId == null) {
-      this.projects = [];
-      this.selectedProject = null;
-      this.selectedProjectId = null;
-      this.hasResultsForSelectedProject = false;
-      this.rebuildGraphData();
-      return;
-    }
-
-    this.projects = this.data.getLoadDevProjectsForRifle(this.selectedRifleId);
-
-    if (this.selectedProjectId != null) {
-      this.selectedProject =
-        this.projects.find(p => p.id === this.selectedProjectId) ?? null;
-      if (!this.selectedProject) this.selectedProjectId = null;
-    }
-
-    if (!this.selectedProject && this.projects.length > 0) {
-      this.selectedProject = this.projects[0];
-      this.selectedProjectId = this.selectedProject.id;
-    }
-
-    this.updateHasResultsFlag();
+  if (this.selectedRifleId == null) {
+    this.projects = [];
+    this.selectedProject = null;
+    this.selectedProjectId = null;
+    this.hasResultsForSelectedProject = false;
     this.rebuildGraphData();
-    if (!this.graphCoords.length) this.showGraph = false;
+    this.resetWizard();
+    return;
   }
+
+  // Load all projects for this rifle
+  this.projects = this.data.getLoadDevProjectsForRifle(this.selectedRifleId);
+
+  // If we already have a selectedProjectId, try to restore it
+  if (this.selectedProjectId != null) {
+    this.selectedProject =
+      this.projects.find(p => p.id === this.selectedProjectId) ?? null;
+
+    // If it no longer exists, clear the selection
+    if (!this.selectedProject) {
+      this.selectedProjectId = null;
+    }
+  }
+
+  // If no project is selected, keep everything clear –
+  // user must either Select load development... or press New.
+  if (this.selectedProjectId == null) {
+    this.selectedProject = null;
+  }
+
+  this.updateHasResultsFlag();
+  this.rebuildGraphData();
+  if (!this.graphCoords.length) {
+    this.showGraph = false;
+  }
+  this.resetWizard();
+}
+
 
   private refreshSelectedProject(): void {
     if (!this.selectedRifleId || !this.selectedProjectId) return;
@@ -237,13 +332,26 @@ export class LoadDevTabComponent implements OnInit {
       this.updateHasResultsFlag();
       this.rebuildGraphData();
       this.showGraph = false;
+      this.resetWizard();
     } else {
       this.selectedProject =
         this.projects.find(p => p.id === this.selectedProjectId) ?? null;
       this.updateHasResultsFlag();
       this.rebuildGraphData();
       if (!this.graphCoords.length) this.showGraph = false;
+      this.resetWizard();
     }
+  }
+
+  /** Current behaviour: Open just makes sure the selectedProject is loaded and visible */
+  openSelectedProject(): void {
+    if (!this.selectedProjectId) {
+      alert('Select a load development first.');
+      return;
+    }
+    this.onProjectSelectChange();
+    this.resultsCollapsed = false;
+    this.resetWizard();
   }
 
   private updateHasResultsFlag(): void {
@@ -260,48 +368,54 @@ export class LoadDevTabComponent implements OnInit {
   // ---------- project CRUD ----------
 
   newProject(): void {
-    if (!this.selectedRifleId) {
-      alert('Select rifle first');
-      return;
-    }
-    this.editingProject = null;
-    this.projectForm = this.createEmptyProjectForm();
-    this.projectForm.rifleId = this.selectedRifleId;
-    this.projectForm.type = 'ladder';
-    this.planner = this.createEmptyPlannerForm();
-    this.projectFormVisible = true;
+  if (!this.selectedRifleId) {
+    alert('Select rifle first');
+    return;
   }
+
+  // Clear any currently selected project / results / graph
+  this.selectedProject = null;
+  this.selectedProjectId = null;
+  this.hasResultsForSelectedProject = false;
+  this.resultsCollapsed = false;
+  this.showGraph = false;
+  this.graphCoords = [];
+  this.graphSvgPoints = '';
+
+  this.editingProject = null;
+  this.projectForm = this.createEmptyProjectForm();
+  this.projectForm.rifleId = this.selectedRifleId;
+  this.planner = this.createEmptyPlannerForm();
+  this.projectFormVisible = true;
+  this.postSaveMessage = null;
+  this.showNotesPanel = false;
+}
 
   cancelProjectForm(): void {
     this.projectFormVisible = false;
     this.editingProject = null;
     this.projectForm = this.createEmptyProjectForm();
     this.planner = this.createEmptyPlannerForm();
+    this.showNotesPanel = false;
   }
 
-  private createLadderEntriesFromPlanner(projectId: number): void {
-    if (this.projectForm.type !== 'ladder') return;
+ private createLadderEntriesFromPlanner(projectId: number): void {
+  if (this.projectForm.type !== 'ladder') return;
 
-    const {
-      distanceM,
-      shotsPerStep,
-      startChargeGr,
-      endChargeGr,
-      stepGr
-    } = this.planner;
+  const { distanceM, startChargeGr, endChargeGr, stepGr } = this.planner;
 
-    if (
-      startChargeGr == null ||
-      endChargeGr == null ||
-      stepGr == null ||
-      stepGr <= 0 ||
-      endChargeGr < startChargeGr
-    ) {
-      return;
-    }
+  if (
+    startChargeGr == null ||
+    endChargeGr == null ||
+    stepGr == null ||
+    stepGr <= 0 ||
+    endChargeGr < startChargeGr
+  ) {
+    return;
+  }
 
-    const dist = distanceM ?? undefined;
-    const shots = shotsPerStep && shotsPerStep > 0 ? shotsPerStep : undefined;
+  const dist = distanceM ?? undefined;
+  const shots = 1; // one shot per step in the ladder
 
     let charge = startChargeGr;
     let localId = 1;
@@ -334,27 +448,34 @@ export class LoadDevTabComponent implements OnInit {
   }
 
   saveProject(): void {
-    if (!this.projectForm.rifleId || !this.projectForm.name.trim()) {
-      alert('Please select rifle and enter name.');
+    if (!this.selectedRifleId || !this.projectForm.name.trim()) {
+      alert('Please select rifle and enter a name for the load development.');
       return;
     }
+
+    const type: LoadDevType = (this.projectForm.type as LoadDevType) || 'ladder';
+
+    this.postSaveMessage = null;
 
     if (this.editingProject) {
       const updated: LoadDevProject = {
         ...this.editingProject,
-        rifleId: this.projectForm.rifleId,
+        rifleId: this.selectedRifleId,
         name: this.projectForm.name.trim(),
-        type: this.projectForm.type,
+        type,
         notes: this.projectForm.notes.trim()
       };
       this.data.updateLoadDevProject(updated);
       this.selectedProjectId = updated.id;
+
+      this.postSaveMessage =
+        'Load development updated. Use the wizard to enter velocities, view the graph and see the highlighted nodes.';
     } else {
       const newProject: LoadDevProject = {
         id: Date.now(),
-        rifleId: this.projectForm.rifleId,
+        rifleId: this.selectedRifleId,
         name: this.projectForm.name.trim(),
-        type: this.projectForm.type,
+        type,
         notes: this.projectForm.notes.trim() || undefined,
         dateStarted: new Date().toISOString(),
         entries: []
@@ -362,15 +483,24 @@ export class LoadDevTabComponent implements OnInit {
       this.data.updateLoadDevProject(newProject);
       this.selectedProjectId = newProject.id;
 
-      // auto-create ladder entries from planner
       this.createLadderEntriesFromPlanner(newProject.id);
+      this.data.createSessionForLoadDevProject(newProject);
+
+      this.postSaveMessage =
+        'Load development planned and saved. Use the wizard to step through data entry, graph view and node highlights.';
     }
+
+    setTimeout(() => {
+      this.postSaveMessage = null;
+    }, 15000);
 
     this.projectFormVisible = false;
     this.editingProject = null;
     this.projectForm = this.createEmptyProjectForm();
     this.planner = this.createEmptyPlannerForm();
+    this.showNotesPanel = false;
     this.loadProjects();
+    this.resetWizard();
   }
 
   deleteProject(project: LoadDevProject): void {
@@ -591,29 +721,21 @@ export class LoadDevTabComponent implements OnInit {
     return map;
   }
 
-nodeCssClass(entry: LoadDevEntry) {
-  const map = this.computeNodesForSelectedProject();
-  const idx = map.get(entry.id);
+  nodeCssClass(entry: LoadDevEntry) {
+    const map = this.computeNodesForSelectedProject();
+    const idx = map.get(entry.id);
 
-  return {
-    // PRIMARY NODE – ultra neon green + glowing outline
-    'bg-black text-white ring-4 ring-[#00ff00] shadow-[0_0_12px_#00ff00]':
-      idx === 0,
+    return {
+      'bg-black text-white ring-4 ring-[#00ff00] shadow-[0_0_12px_#00ff00]':
+        idx === 0,
+      'bg-black text-white ring-4 ring-[#ff9900] shadow-[0_0_12px_#ff9900]':
+        idx === 1,
+      'bg-black text-white ring-4 ring-[#ff0000] shadow-[0_0_12px_#ff0000]':
+        idx === 2
+    };
+  }
 
-    // SECOND NODE – ultra neon orange + glowing outline
-    'bg-black text-white ring-4 ring-[#ff9900] shadow-[0_0_12px_#ff9900]':
-      idx === 1,
-
-    // THIRD NODE – ultra neon red + glowing outline
-    'bg-black text-white ring-4 ring-[#ff0000] shadow-[0_0_12px_#ff0000]':
-      idx === 2
-  };
-}
-
-
-
-
-  // ---------- helper: are all entries populated with velocity? ----------
+  // ---------- helpers for wizard / velocity input ----------
 
   allEntriesHaveVelocity(): boolean {
     if (!this.selectedProject || !this.selectedProject.entries?.length) {
@@ -626,8 +748,6 @@ nodeCssClass(entry: LoadDevEntry) {
       return values.length > 0;
     });
   }
-
-  // ---------- wizard append helper ----------
 
   private appendVelocityToEntry(entry: LoadDevEntry, value: number): void {
     if (!this.selectedProject) return;
@@ -666,7 +786,6 @@ nodeCssClass(entry: LoadDevEntry) {
 
     if (!pts.length) return;
 
-    // sort by charge (x-axis)
     pts.sort((a, b) => a.charge - b.charge);
 
     let min = pts[0].avg;
@@ -809,7 +928,7 @@ nodeCssClass(entry: LoadDevEntry) {
     this.finishLadderWizard();
   }
 
-  // ---------- single-row velocity edit (REPLACE set) ----------
+  // ---------- single-row velocity edit (replace set) ----------
 
   editVelocityForEntry(entry: LoadDevEntry): void {
     this.ladderWizardActive = false;
@@ -828,7 +947,6 @@ nodeCssClass(entry: LoadDevEntry) {
     const raw = this.velocityEditValue ?? '';
     const trimmed = raw.toString().trim();
 
-    // If user clears it completely, remove velocities for this row
     if (!trimmed) {
       const any = this.velocityEditEntry as any;
       any.velocityInput = undefined;
@@ -840,7 +958,6 @@ nodeCssClass(entry: LoadDevEntry) {
       return;
     }
 
-    // User may type one or more numbers: "2805", or "2805 2810 2808"
     const values = this.parseVelocityInput(trimmed);
     if (!values.length) {
       alert(
@@ -873,29 +990,33 @@ nodeCssClass(entry: LoadDevEntry) {
       this.velocityEditValue = '';
     }
   }
+
+  // ---------- back out of load dev ----------
+
   onBackFromLoadDev(): void {
-  // Clear selection and collapse any open panels
-  this.selectedProjectId = null;
-  this.selectedProject = null;
-  this.projectFormVisible = false;
-  this.editingProject = null;
+    this.selectedProjectId = null;
+    this.selectedProject = null;
+    this.projectFormVisible = false;
+    this.editingProject = null;
 
-  this.entryFormVisible = false;
-  this.editingEntry = null;
+    this.entryFormVisible = false;
+    this.editingEntry = null;
 
-  this.hasResultsForSelectedProject = false;
-  this.resultsCollapsed = false;
-  this.showGraph = false;
-  this.graphCoords = [];
-  this.graphSvgPoints = '';
+    this.hasResultsForSelectedProject = false;
+    this.resultsCollapsed = false;
+    this.showGraph = false;
+    this.graphCoords = [];
+    this.graphSvgPoints = '';
 
-  this.singleVelocityEditActive = false;
-  this.velocityEditEntry = null;
-  this.velocityEditValue = '';
+    this.singleVelocityEditActive = false;
+    this.velocityEditEntry = null;
+    this.velocityEditValue = '';
 
-  this.ladderWizardActive = false;
-  this.ladderWizardEntries = [];
-  this.ladderWizardIndex = 0;
-}
+    this.ladderWizardActive = false;
+    this.ladderWizardEntries = [];
+    this.ladderWizardIndex = 0;
 
+    this.postSaveMessage = null;
+    this.resetWizard();
+  }
 }

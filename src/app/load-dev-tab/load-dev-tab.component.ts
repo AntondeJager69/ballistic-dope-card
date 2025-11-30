@@ -76,6 +76,7 @@ export class LoadDevTabComponent implements OnInit {
   projects: LoadDevProject[] = [];
   selectedProjectId: number | null = null;
   selectedProject: LoadDevProject | null = null;
+  
 
   // New / edit project form
   projectFormVisible = false;
@@ -447,7 +448,7 @@ export class LoadDevTabComponent implements OnInit {
     }
   }
 
-  saveProject(): void {
+    saveProject(): void {
     if (!this.selectedRifleId || !this.projectForm.name.trim()) {
       alert('Please select rifle and enter a name for the load development.');
       return;
@@ -469,7 +470,7 @@ export class LoadDevTabComponent implements OnInit {
       this.selectedProjectId = updated.id;
 
       this.postSaveMessage =
-        'Load development updated. Use the wizard to enter velocities, view the graph and see the highlighted nodes.';
+        'Load development updated. You can use the "Add load data - wizard" to capture velocities and update the graph.';
     } else {
       const newProject: LoadDevProject = {
         id: Date.now(),
@@ -487,7 +488,7 @@ export class LoadDevTabComponent implements OnInit {
       this.data.createSessionForLoadDevProject(newProject);
 
       this.postSaveMessage =
-        'Load development planned and saved. Use the wizard to step through data entry, graph view and node highlights.';
+        'Load development saved and ladder table created. Go shoot this series at the range, then return here and tap "Add load data - wizard" in Results to input your velocities and highlight the nodes.';
     }
 
     setTimeout(() => {

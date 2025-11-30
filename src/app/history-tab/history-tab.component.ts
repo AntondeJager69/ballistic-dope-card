@@ -13,7 +13,7 @@ export class HistoryTabComponent implements OnInit {
   sessions: any[] = [];
   // NEW: highlighted sessions that still need DOPE capture
   pendingSessions: any[] = [];
-
+  notesExpanded: boolean = false; 
   selectedSessionId: string | null = null;
   editSession: any | null = null;
   validationError: string | null = null;

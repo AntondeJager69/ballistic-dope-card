@@ -202,34 +202,41 @@ export class HistoryTabComponent implements OnInit {
     // Deep clone so we can edit safely
     this.editSession = JSON.parse(JSON.stringify(s));
   }
+deleteSession(s: any): void {
+  if (!s || !s.id) return;
 
-  deleteSession(s: any): void {
-    if (!s || !s.id) return;
+  const confirmed = confirm(
+    'Delete this session from history? This cannot be undone.'
+  );
+  if (!confirmed) return;
 
-    const confirmed = confirm('Delete this session from history? This cannot be undone.');
-    if (!confirmed) return;
+  const id = s.id;
 
-    const idx = this.sessions.findIndex(sess => sess.id === s.id);
-    if (idx >= 0) {
-      // Update local list
-      this.sessions.splice(idx, 1);
-
-      // Persist via DataService
-      try {
-        const ds: any = this.dataService;
-        if (ds && typeof ds.deleteSession === 'function') {
-          ds.deleteSession(s.id);
-        }
-      } catch (err) {
-        console.error('Error deleting session from DataService:', err);
-      }
-    }
-
-    if (this.selectedSessionId === s.id) {
-      this.selectedSessionId = null;
-      this.editSession = null;
-    }
+  // Remove from local sessions array
+  const idx = this.sessions.findIndex(sess => sess.id === id);
+  if (idx >= 0) {
+    this.sessions.splice(idx, 1);
   }
+
+  // Persist via DataService
+  try {
+    const ds: any = this.dataService;
+    if (ds && typeof ds.deleteSession === 'function') {
+      ds.deleteSession(id);
+    }
+  } catch (err) {
+    console.error('Error deleting session from DataService:', err);
+  }
+
+  // If this was the open session, close the detail view
+  if (this.selectedSessionId === id) {
+    this.selectedSessionId = null;
+    this.editSession = null;
+  }
+
+  // 🔥 IMPORTANT: refresh yellow block at the top
+  this.rebuildPendingSessions();
+}
 
   // --------------------------------------------------
   // Editable rules for DOPE

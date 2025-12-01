@@ -136,7 +136,8 @@ export class LoadDevTabComponent implements OnInit {
     return {
       rifleId: null,
       name: '',
-      type: null,
+      // DEFAULT TO LADDER SO NEW PROJECT SHOWS LADDER FIELDS
+      type: 'ladder',
       notes: '',
       powder: '',
       bullet: '',
@@ -258,63 +259,61 @@ export class LoadDevTabComponent implements OnInit {
 
   // ---------- rifle / project loading ----------
 
- onRifleChange(): void {
-  // When rifle changes, clear any selected project so user must choose / create one
-  this.selectedProjectId = null;
-  this.selectedProject = null;
-  this.hasResultsForSelectedProject = false;
-  this.resultsCollapsed = false;
-  this.showGraph = false;
-  this.graphCoords = [];
-  this.graphSvgPoints = '';
+  onRifleChange(): void {
+    // When rifle changes, clear any selected project so user must choose / create one
+    this.selectedProjectId = null;
+    this.selectedProject = null;
+    this.hasResultsForSelectedProject = false;
+    this.resultsCollapsed = false;
+    this.showGraph = false;
+    this.graphCoords = [];
+    this.graphSvgPoints = '';
 
-  this.loadProjects();
-}
-
+    this.loadProjects();
+  }
 
   private resetWizard(): void {
     this.showGraph = false;
   }
 
   private loadProjects(): void {
-  if (this.selectedRifleId == null) {
-    this.projects = [];
-    this.selectedProject = null;
-    this.selectedProjectId = null;
-    this.hasResultsForSelectedProject = false;
-    this.rebuildGraphData();
-    this.resetWizard();
-    return;
-  }
-
-  // Load all projects for this rifle
-  this.projects = this.data.getLoadDevProjectsForRifle(this.selectedRifleId);
-
-  // If we already have a selectedProjectId, try to restore it
-  if (this.selectedProjectId != null) {
-    this.selectedProject =
-      this.projects.find(p => p.id === this.selectedProjectId) ?? null;
-
-    // If it no longer exists, clear the selection
-    if (!this.selectedProject) {
+    if (this.selectedRifleId == null) {
+      this.projects = [];
+      this.selectedProject = null;
       this.selectedProjectId = null;
+      this.hasResultsForSelectedProject = false;
+      this.rebuildGraphData();
+      this.resetWizard();
+      return;
     }
-  }
 
-  // If no project is selected, keep everything clear –
-  // user must either Select load development... or press New.
-  if (this.selectedProjectId == null) {
-    this.selectedProject = null;
-  }
+    // Load all projects for this rifle
+    this.projects = this.data.getLoadDevProjectsForRifle(this.selectedRifleId);
 
-  this.updateHasResultsFlag();
-  this.rebuildGraphData();
-  if (!this.graphCoords.length) {
-    this.showGraph = false;
-  }
-  this.resetWizard();
-}
+    // If we already have a selectedProjectId, try to restore it
+    if (this.selectedProjectId != null) {
+      this.selectedProject =
+        this.projects.find(p => p.id === this.selectedProjectId) ?? null;
 
+      // If it no longer exists, clear the selection
+      if (!this.selectedProject) {
+        this.selectedProjectId = null;
+      }
+    }
+
+    // If no project is selected, keep everything clear –
+    // user must either Select load development... or press New.
+    if (this.selectedProjectId == null) {
+      this.selectedProject = null;
+    }
+
+    this.updateHasResultsFlag();
+    this.rebuildGraphData();
+    if (!this.graphCoords.length) {
+      this.showGraph = false;
+    }
+    this.resetWizard();
+  }
 
   private refreshSelectedProject(): void {
     if (!this.selectedRifleId || !this.selectedProjectId) return;
@@ -368,28 +367,30 @@ export class LoadDevTabComponent implements OnInit {
   // ---------- project CRUD ----------
 
   newProject(): void {
-  if (!this.selectedRifleId) {
-    alert('Select rifle first');
-    return;
+    if (!this.selectedRifleId) {
+      alert('Select rifle first');
+      return;
+    }
+
+    // Clear any currently selected project / results / graph
+    this.selectedProject = null;
+    this.selectedProjectId = null;
+    this.hasResultsForSelectedProject = false;
+    this.resultsCollapsed = false;
+    this.showGraph = false;
+    this.graphCoords = [];
+    this.graphSvgPoints = '';
+
+    this.editingProject = null;
+    this.projectForm = this.createEmptyProjectForm();
+    this.projectForm.rifleId = this.selectedRifleId;
+    // FORCE LADDER TYPE FOR NEW PROJECTS (LADDER ONLY FOR NOW)
+    this.projectForm.type = 'ladder';
+    this.planner = this.createEmptyPlannerForm();
+    this.projectFormVisible = true;
+    this.postSaveMessage = null;
+    this.showNotesPanel = false;
   }
-
-  // Clear any currently selected project / results / graph
-  this.selectedProject = null;
-  this.selectedProjectId = null;
-  this.hasResultsForSelectedProject = false;
-  this.resultsCollapsed = false;
-  this.showGraph = false;
-  this.graphCoords = [];
-  this.graphSvgPoints = '';
-
-  this.editingProject = null;
-  this.projectForm = this.createEmptyProjectForm();
-  this.projectForm.rifleId = this.selectedRifleId;
-  this.planner = this.createEmptyPlannerForm();
-  this.projectFormVisible = true;
-  this.postSaveMessage = null;
-  this.showNotesPanel = false;
-}
 
   cancelProjectForm(): void {
     this.projectFormVisible = false;
@@ -399,23 +400,23 @@ export class LoadDevTabComponent implements OnInit {
     this.showNotesPanel = false;
   }
 
- private createLadderEntriesFromPlanner(projectId: number): void {
-  if (this.projectForm.type !== 'ladder') return;
+  private createLadderEntriesFromPlanner(projectId: number): void {
+    if (this.projectForm.type !== 'ladder') return;
 
-  const { distanceM, startChargeGr, endChargeGr, stepGr } = this.planner;
+    const { distanceM, startChargeGr, endChargeGr, stepGr } = this.planner;
 
-  if (
-    startChargeGr == null ||
-    endChargeGr == null ||
-    stepGr == null ||
-    stepGr <= 0 ||
-    endChargeGr < startChargeGr
-  ) {
-    return;
-  }
+    if (
+      startChargeGr == null ||
+      endChargeGr == null ||
+      stepGr == null ||
+      stepGr <= 0 ||
+      endChargeGr < startChargeGr
+    ) {
+      return;
+    }
 
-  const dist = distanceM ?? undefined;
-  const shots = 1; // one shot per step in the ladder
+    const dist = distanceM ?? undefined;
+    const shots = 1; // one shot per step in the ladder
 
     let charge = startChargeGr;
     let localId = 1;

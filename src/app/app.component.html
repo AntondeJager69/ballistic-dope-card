@@ -352,7 +352,8 @@
           </div>
 
           <div *ngIf="currentTab === 'history'">
-            <app-history-tab></app-history-tab>
+            <!-- 🔻 wired Back from History to Menu -->
+            <app-history-tab (backToMenu)="setTab('menu')"></app-history-tab>
           </div>
 
           <div *ngIf="currentTab === 'loadDev'">

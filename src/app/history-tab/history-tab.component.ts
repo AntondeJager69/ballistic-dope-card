@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, EventEmitter, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../data.service';
 
@@ -13,7 +13,7 @@ export class HistoryTabComponent implements OnInit {
   sessions: any[] = [];
   // NEW: highlighted sessions that still need DOPE capture
   pendingSessions: any[] = [];
-  notesExpanded: boolean = false; 
+  notesExpanded: boolean = false;
   selectedSessionId: string | null = null;
   editSession: any | null = null;
   validationError: string | null = null;
@@ -22,6 +22,9 @@ export class HistoryTabComponent implements OnInit {
 
   searchTerm: string = '';
   expandedVenueId: number | null = null;
+
+  // 🔸 Tell parent when user presses Back
+  @Output() backToMenu = new EventEmitter<void>();
 
   constructor(private dataService: DataService) {}
 
@@ -101,7 +104,7 @@ export class HistoryTabComponent implements OnInit {
   // Search & grouping for venue-based history view
   // --------------------------------------------------
   get filteredSessions(): any[] {
-    // Normal History block shows only non-editable sessions.
+    // History list only shows non-editable sessions.
     const base = (this.sessions || []).filter(
       (s: any) => !this.isSessionEditable(s)
     );
@@ -202,51 +205,47 @@ export class HistoryTabComponent implements OnInit {
     // Deep clone so we can edit safely
     this.editSession = JSON.parse(JSON.stringify(s));
   }
-deleteSession(s: any): void {
-  if (!s || !s.id) return;
 
-  const confirmed = confirm(
-    'Delete this session from history? This cannot be undone.'
-  );
-  if (!confirmed) return;
+  deleteSession(s: any): void {
+    if (!s || !s.id) return;
 
-  const id = s.id;
+    const confirmed = confirm(
+      'Delete this session from history? This cannot be undone.'
+    );
+    if (!confirmed) return;
 
-  // Remove from local sessions array
-  const idx = this.sessions.findIndex(sess => sess.id === id);
-  if (idx >= 0) {
-    this.sessions.splice(idx, 1);
-  }
+    const id = s.id;
 
-  // Persist via DataService
-  try {
-    const ds: any = this.dataService;
-    if (ds && typeof ds.deleteSession === 'function') {
-      ds.deleteSession(id);
+    // Remove from local sessions array
+    const idx = this.sessions.findIndex(sess => sess.id === id);
+    if (idx >= 0) {
+      this.sessions.splice(idx, 1);
     }
-  } catch (err) {
-    console.error('Error deleting session from DataService:', err);
-  }
 
-  // If this was the open session, close the detail view
-  if (this.selectedSessionId === id) {
-    this.selectedSessionId = null;
-    this.editSession = null;
-  }
+    // Persist via DataService
+    try {
+      const ds: any = this.dataService;
+      if (ds && typeof ds.deleteSession === 'function') {
+        ds.deleteSession(id);
+      }
+    } catch (err) {
+      console.error('Error deleting session from DataService:', err);
+    }
 
-  // 🔥 IMPORTANT: refresh yellow block at the top
-  this.rebuildPendingSessions();
-}
+    // If this was the open session, close the detail view
+    if (this.selectedSessionId === id) {
+      this.selectedSessionId = null;
+      this.editSession = null;
+    }
+
+    // refresh yellow block at the top
+    this.rebuildPendingSessions();
+  }
 
   // --------------------------------------------------
   // Editable rules for DOPE
   // --------------------------------------------------
 
-  /**
-   * Session is editable (In progress) if:
-   * - has DOPE array,
-   * - not completed yet
-   */
   isSessionEditable(session: any | null): boolean {
     return !!(
       session &&
@@ -256,10 +255,6 @@ deleteSession(s: any): void {
     );
   }
 
-  /**
-   * True only if every DOPE row has all fields filled:
-   * elevationMil, windageMil, windSpeed, windDirection.
-   */
   isSessionFullyCompleted(session: any | null): boolean {
     if (
       !session ||
@@ -328,7 +323,7 @@ deleteSession(s: any): void {
         row._windSpeedAuto = true;
       }
       if (row.windDirection == null && envClock != null) {
-        row.windDirection = envClock.toString(); // store as "3", "9", etc.
+        row.windDirection = envClock.toString();
         row._windDirectionAuto = true;
       }
     }
@@ -352,7 +347,6 @@ deleteSession(s: any): void {
     return '↖';
   }
 
-  // 12 o'clock (headwind) = 0°, 3 o'clock (from right) = 90°, etc.
   private clockToDegrees(clock: number): number {
     let c = clock;
     if (c < 1) c = 1;
@@ -371,7 +365,6 @@ deleteSession(s: any): void {
 
     let dirRaw: any = row.windDirection;
 
-    // If row has nothing, try environment
     if (dirRaw == null && this.editSession?.environment) {
       dirRaw =
         this.editSession.environment.windDirectionDeg ??
@@ -383,7 +376,6 @@ deleteSession(s: any): void {
 
     const str = String(dirRaw).trim();
 
-    // Case 1: "3 o'clock" style
     if (str.includes("o'clock")) {
       const num = parseFloat(str);
       if (!isNaN(num) && num >= 1 && num <= 12) {
@@ -395,16 +387,12 @@ deleteSession(s: any): void {
     const num = parseFloat(str);
     if (!isNaN(num)) {
       if (num >= 1 && num <= 12 && !str.includes('°')) {
-        // Treat 1–12 as clock (target at 12 o'clock)
         const degFromClock = this.clockToDegrees(num);
         return this.degreesToArrow(degFromClock);
       }
-
-      // Treat anything else as degrees
       return this.degreesToArrow(num);
     }
 
-    // Fallback: no idea, show dot
     return '•';
   }
 
@@ -415,21 +403,17 @@ deleteSession(s: any): void {
     if (!this.editSession) return;
 
     if (!this.isSessionEditable(this.editSession)) {
-      // In read-only states, primary button is simply Close, so bail here.
       return;
     }
 
     if (!this.isSessionFullyCompleted(this.editSession)) {
-      // Partial, still in-progress.
       this.saveInProgress();
       return;
     }
 
-    // Fully completed DOPE -> mark session completed
     this.saveAndComplete();
   }
 
-  /** Save partial DOPE, keep session In progress, show toast. */
   private saveInProgress(): void {
     if (!this.editSession) return;
 
@@ -444,11 +428,9 @@ deleteSession(s: any): void {
     }
   }
 
-  /** Save DOPE and mark as Completed, show toast. */
   private saveAndComplete(): void {
     if (!this.editSession) return;
 
-    // Final validation
     if (!this.isSessionFullyCompleted(this.editSession)) {
       this.validationError = 'Please fill all DOPE fields (elevation, wind, speed, direction).';
       return;
@@ -463,17 +445,15 @@ deleteSession(s: any): void {
       this.rebuildPendingSessions();
       this.showSaveMessage('Session saved & marked as completed.');
 
-      // NEW: collapse back to History view
       this.editSession = null;
       this.selectedSessionId = null;
       this.expandedVenueId = null;
     }
   }
 
-   private persistSessions(): void {
+  private persistSessions(): void {
     try {
       const ds: any = this.dataService;
-      // DataService has updateSession(), not saveSessions().
       if (ds && typeof ds.updateSession === 'function') {
         for (const s of this.sessions) {
           ds.updateSession(s);
@@ -501,6 +481,19 @@ deleteSession(s: any): void {
       this.saveMessageTimeout = null;
     }
     this.saveMessage = null;
+  }
+
+  // --------------------------------------------------
+  // Back from main History list
+  // --------------------------------------------------
+  onBackFromHistory(): void {
+    // Reset local History-tab state
+    this.closeEdit();
+    this.selectedSessionId = null;
+    this.expandedVenueId = null;
+
+    // 🔸 Tell the parent "please go back to Menu tab"
+    this.backToMenu.emit();
   }
 
   // --------------------------------------------------

@@ -201,72 +201,80 @@
         </div>
       </div>
 
-      <!-- Ladder planning (distance + start/end/step) -->
-      <div
-        *ngIf="projectForm.type === 'ladder'"
-        class="mt-2 border border-gray-800 rounded-2xl p-2 text-[11px] bg-black/40 space-y-2"
-      >
-        <div class="text-gray-100 font-semibold">
-          Ladder planning
-        </div>
-        <div class="text-[10px] text-gray-400">
-          Set the distance and charge window for your ladder.
-        </div>
+     <!-- Ladder / OCW planning (distance + start/end/step) -->
+<div
+  *ngIf="projectForm.type === 'ladder' || projectForm.type === 'ocw'"
+  class="mt-2 border border-gray-800 rounded-2xl p-2 text-[11px] bg-black/40 space-y-2"
+>
 
-        <!-- Distance -->
-        <div class="mt-1">
-          <div class="text-gray-400 mb-0.5">Distance (m)</div>
-          <input
-            type="number"
-            class="w-full bg-black/40 border border-gray-700 rounded-2xl px-2 py-1 text-gray-100"
-            [(ngModel)]="planner.distanceM"
-          />
-        </div>
+  <div class="text-gray-100 font-semibold">
+    {{ projectForm.type === 'ocw' ? 'OCW planning' : 'Ladder planning' }}
+  </div>
 
-        <!-- Start / End / Step aligned -->
-        <div class="grid grid-cols-3 gap-2 mt-1">
-          <div>
-            <div class="text-gray-400 mb-0.5">Start (gr)</div>
-            <input
-              type="number"
-              class="w-full bg-black/40 border border-gray-700 rounded-2xl px-2 py-1 text-gray-100"
-              [(ngModel)]="planner.startChargeGr"
-            />
-          </div>
-          <div>
-            <div class="text-gray-400 mb-0.5">End (gr)</div>
-            <input
-              type="number"
-              class="w-full bg-black/40 border border-gray-700 rounded-2xl px-2 py-1 text-gray-100"
-              [(ngModel)]="planner.endChargeGr"
-            />
-          </div>
-          <div>
-            <div class="text-gray-400 mb-0.5">Step (gr)</div>
-            <input
-              type="number"
-              class="w-full bg-black/40 border border-gray-700 rounded-2xl px-2 py-1 text-gray-100"
-              [(ngModel)]="planner.stepGr"
-            />
-          </div>
-        </div>
-      </div>
+  <div class="text-[10px] text-gray-400">
+    {{
+      projectForm.type === 'ocw'
+        ? 'Set the distance and charge window for your OCW. Same as ladder, but you will shoot multiple shots per charge.'
+        : 'Set the distance and charge window for your ladder test.'
+    }}
+  </div>
 
-      <div class="flex justify-end gap-2 text-[11px] mt-2">
-        <button
-          class="px-3 py-1.5 rounded-2xl bg-gray-700 text-gray-100"
-          (click)="cancelProjectForm()"
-        >
-          Cancel
-        </button>
-        <button
-          class="px-3 py-1.5 rounded-2xl bg-emerald-500 text-black font-semibold"
-          (click)="saveProject()"
-        >
-          Save
-        </button>
-      </div>
+
+  <!-- Distance -->
+  <div class="mt-1">
+    <div class="text-gray-400 mb-0.5">Distance (m)</div>
+    <input
+      type="number"
+      class="w-full bg-black/40 border border-gray-700 rounded-2xl px-2 py-1 text-gray-100"
+      [(ngModel)]="planner.distanceM"
+    />
+  </div>
+
+  <!-- Start / End / Step -->
+  <div class="grid grid-cols-3 gap-2 mt-1">
+    <div>
+      <div class="text-gray-400 mb-0.5">Start (gr)</div>
+      <input
+        type="number"
+        class="w-full bg-black/40 border border-gray-700 rounded-2xl px-2 py-1 text-gray-100"
+        [(ngModel)]="planner.startChargeGr"
+      />
     </div>
+    <div>
+      <div class="text-gray-400 mb-0.5">End (gr)</div>
+      <input
+        type="number"
+        class="w-full bg-black/40 border border-gray-700 rounded-2xl px-2 py-1 text-gray-100"
+        [(ngModel)]="planner.endChargeGr"
+      />
+    </div>
+    <div>
+      <div class="text-gray-400 mb-0.5">Step (gr)</div>
+      <input
+        type="number"
+        class="w-full bg-black/40 border border-gray-700 rounded-2xl px-2 py-1 text-gray-100"
+        [(ngModel)]="planner.stepGr"
+      />
+    </div>
+  </div>
+
+  <!-- Shots per group: OCW only -->
+  <div
+    *ngIf="projectForm.type === 'ocw'"
+    class="mt-2"
+  >
+    <div class="text-gray-400 mb-0.5">Shots per group</div>
+    <input
+      type="number"
+      class="w-full bg-black/40 border border-gray-700 rounded-2xl px-2 py-1 text-gray-100"
+      [(ngModel)]="planner.shotsPerGroup"
+    />
+    <div class="mt-0.5 text-[9px] text-gray-500">
+      e.g. 3 for 3-shot OCW groups per charge.
+    </div>
+  </div>
+</div>
+
 
     <!-- Below here should be hidden while New form is open -->
     <ng-container *ngIf="selectedProject && !projectFormVisible">

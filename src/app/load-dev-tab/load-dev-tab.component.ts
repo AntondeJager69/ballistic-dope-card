@@ -47,7 +47,9 @@ interface PlannerForm {
   startChargeGr: number | null;
   endChargeGr: number | null;
   stepGr: number | null;
+  shotsPerGroup: number | null; // OCW: how many shots per step
 }
+
 
 interface VelocityStats {
   avg: number;
@@ -68,6 +70,9 @@ interface NodeEntry {
   templateUrl: './load-dev-tab.component.html'
 })
 export class LoadDevTabComponent implements OnInit {
+startOcwWizard() {
+throw new Error('Method not implemented.');
+}
   // Rifles
   rifles: Rifle[] = [];
   selectedRifleId: number | null = null;
@@ -168,14 +173,16 @@ export class LoadDevTabComponent implements OnInit {
     };
   }
 
-  private createEmptyPlannerForm(): PlannerForm {
-    return {
-      distanceM: null,
-      startChargeGr: null,
-      endChargeGr: null,
-      stepGr: null
-    };
-  }
+ private createEmptyPlannerForm(): PlannerForm {
+  return {
+    distanceM: null,
+    startChargeGr: null,
+    endChargeGr: null,
+    stepGr: null,
+    shotsPerGroup: null
+  };
+}
+
 
   shortDate(value: string | Date | null | undefined): string {
     if (!value) return '';
@@ -401,52 +408,67 @@ export class LoadDevTabComponent implements OnInit {
   }
 
   private createLadderEntriesFromPlanner(projectId: number): void {
-    if (this.projectForm.type !== 'ladder') return;
+  const type = this.projectForm.type;
 
-    const { distanceM, startChargeGr, endChargeGr, stepGr } = this.planner;
+  // Only create entries for ladder or OCW projects
+  if (type !== 'ladder' && type !== 'ocw') return;
 
-    if (
-      startChargeGr == null ||
-      endChargeGr == null ||
-      stepGr == null ||
-      stepGr <= 0 ||
-      endChargeGr < startChargeGr
-    ) {
-      return;
-    }
+  const {
+    distanceM,
+    startChargeGr,
+    endChargeGr,
+    stepGr,
+    shotsPerGroup
+  } = this.planner;
 
-    const dist = distanceM ?? undefined;
-    const shots = 1; // one shot per step in the ladder
-
-    let charge = startChargeGr;
-    let localId = 1;
-
-    while (charge <= endChargeGr + 1e-6) {
-      const roundedCharge = Number(charge.toFixed(2));
-
-      const entry: LoadDevEntry = {
-        id: localId++,
-        loadLabel: '',
-        powder: undefined,
-        chargeGr: roundedCharge,
-        coal: undefined,
-        primer: undefined,
-        bullet: undefined,
-        bulletWeightGr: undefined,
-        bulletBc: undefined,
-        distanceM: dist,
-        shotsFired: shots,
-        groupSize: undefined,
-        groupUnit: 'MOA',
-        poiNote: undefined,
-        notes: undefined
-      } as LoadDevEntry;
-
-      this.data.updateLoadDevEntry(projectId, entry);
-
-      charge = Number((charge + stepGr).toFixed(2));
-    }
+  if (
+    startChargeGr == null ||
+    endChargeGr == null ||
+    stepGr == null ||
+    stepGr <= 0 ||
+    endChargeGr < startChargeGr
+  ) {
+    return;
   }
+
+  const dist = distanceM ?? undefined;
+
+  // For ladder: default 1 shot per step
+  // For OCW: use "shots per group" if given, otherwise leave undefined
+  const defaultShots: number | undefined =
+    type === 'ocw'
+      ? (shotsPerGroup ?? undefined)
+      : 1;
+
+  let charge = startChargeGr;
+  let localId = 1;
+
+  while (charge <= endChargeGr + 1e-6) {
+    const roundedCharge = Number(charge.toFixed(2));
+
+    const entry: LoadDevEntry = {
+      id: localId++,
+      loadLabel: '',
+      powder: undefined,
+      chargeGr: roundedCharge,
+      coal: undefined,
+      primer: undefined,
+      bullet: undefined,
+      bulletWeightGr: undefined,
+      bulletBc: undefined,
+      distanceM: dist,
+      shotsFired: defaultShots,
+      groupSize: undefined,
+      groupUnit: 'MOA',
+      poiNote: undefined,
+      notes: undefined
+    } as LoadDevEntry;
+
+    this.data.updateLoadDevEntry(projectId, entry);
+
+    charge = Number((charge + stepGr).toFixed(2));
+  }
+}
 
   saveProject(): void {
     if (!this.selectedRifleId || !this.projectForm.name.trim()) {
@@ -829,6 +851,7 @@ export class LoadDevTabComponent implements OnInit {
     if (!this.selectedProject || this.selectedProject.type !== 'ladder') {
       alert('This is not a ladder test');
       return;
+      
     }
 
     if (this.allEntriesHaveVelocity()) {

@@ -1,17 +1,69 @@
 <div class="w-full h-full flex flex-col gap-3 text-gray-100 text-[11px]">
-  <!-- Header / inputs -->
+
+  <!-- Rifle / ballistic inputs (placeholder now, rifle data later) -->
+  <div class="bg-gray-900/70 border border-gray-700 rounded-xl p-2">
+    <div class="flex items-center justify-between text-[10px] text-gray-400">
+      <span>Rifle / ballistics (from Rifles tab later)</span>
+    </div>
+    <div class="grid grid-cols-3 gap-2 mt-1">
+      <div>
+        <div class="text-[9px] text-gray-400">Range (m)</div>
+        <input
+          type="number"
+          [(ngModel)]="rangeMeters"
+          class="w-full bg-black border border-gray-700 rounded-lg px-2 py-0.5 text-[10px]"
+          min="0"
+          step="10"
+        />
+      </div>
+      <div>
+        <div class="text-[9px] text-gray-400">MV (fps)</div>
+        <input
+          type="number"
+          [(ngModel)]="muzzleVelocityFps"
+          class="w-full bg-black border border-gray-700 rounded-lg px-2 py-0.5 text-[10px]"
+          min="0"
+          step="10"
+        />
+      </div>
+      <div>
+        <div class="text-[9px] text-gray-400">BC (G1)</div>
+        <input
+          type="number"
+          [(ngModel)]="ballisticCoeff"
+          class="w-full bg-black border border-gray-700 rounded-lg px-2 py-0.5 text-[10px]"
+          min="0"
+          step="0.01"
+        />
+      </div>
+    </div>
+  </div>
+
+  <!-- Wind speed + direction -->
   <div class="flex items-end gap-3">
     <div class="flex-1">
       <label class="block text-[10px] text-gray-300 mb-0.5">
-        Wind speed (mph)
+        Wind speed
       </label>
-      <input
-        type="number"
-        [(ngModel)]="windSpeedMph"
-        class="w-full bg-black border border-gray-700 rounded-xl px-2 py-1 text-[11px]"
-        min="0"
-        step="0.1"
-      />
+      <div class="flex items-center gap-2">
+        <input
+          type="number"
+          [ngModel]="windSpeedInput"
+          (ngModelChange)="onWindSpeedInputChange($event)"
+          class="flex-1 bg-black border border-gray-700 rounded-xl px-2 py-1 text-[11px]"
+          min="0"
+          step="0.1"
+        />
+        <select
+          [(ngModel)]="windUnit"
+          (ngModelChange)="onWindUnitChange($event)"
+          class="w-20 bg-black border border-gray-700 rounded-xl px-1.5 py-1 text-[10px]"
+        >
+          <option value="mph">mph</option>
+          <option value="mps">m/s</option>
+          <option value="kmh">km/h</option>
+        </select>
+      </div>
     </div>
 
     <div class="text-right text-[10px] leading-tight">
@@ -19,10 +71,13 @@
       <div class="font-semibold text-gray-100">
         {{ windClock }} o'clock
       </div>
+      <div class="text-emerald-400 mt-0.5">
+        {{ windLabel }}
+      </div>
     </div>
   </div>
 
-  <!-- Circle with draggable arrow -->
+  <!-- Circle with draggable arrows -->
   <div
     #circleArea
     class="relative w-full max-w-xs mx-auto aspect-square select-none touch-none"
@@ -42,7 +97,7 @@
         stroke-width="1.5"
       ></circle>
 
-      <!-- Inner circle (impact zone) -->
+      <!-- Inner impact zone -->
       <circle
         cx="50"
         cy="50"
@@ -51,7 +106,7 @@
         stroke-width="0.8"
       ></circle>
 
-      <!-- Crosshair in the clock -->
+      <!-- Crosshair -->
       <line
         x1="50"
         y1="30"
@@ -93,9 +148,8 @@
         </text>
       </ng-container>
 
-      <!-- Fat arrow on outer edge (draggable, pointing OUT from wind source) -->
+      <!-- Orange arrow: wind blowing TO -->
       <g [attr.transform]="'rotate(' + arrowAngleDeg + ' 50 50)'">
-        <!-- shaft from inner to outer edge -->
         <line
           x1="50"
           y1="20"
@@ -105,14 +159,30 @@
           stroke-width="2.8"
           stroke-linecap="round"
         ></line>
-        <!-- head pointing outward -->
         <polygon
           points="50,4 44,10 56,10"
           class="fill-orange-400"
         ></polygon>
       </g>
 
-      <!-- Red POI dot (simple visual drift) -->
+      <!-- Blue arrow: wind coming FROM (180° opposite) -->
+      <g [attr.transform]="'rotate(' + (arrowAngleDeg + 180) + ' 50 50)'">
+        <line
+          x1="50"
+          y1="20"
+          x2="50"
+          y2="7"
+          class="stroke-sky-400"
+          stroke-width="2"
+          stroke-linecap="round"
+        ></line>
+        <polygon
+          points="50,4 44,10 56,10"
+          class="fill-sky-400"
+        ></polygon>
+      </g>
+
+      <!-- Red POI drift dot -->
       <circle
         [attr.cx]="poiX"
         [attr.cy]="poiY"
@@ -123,29 +193,34 @@
   </div>
 
   <p class="text-[10px] text-gray-400 text-center px-4 leading-snug">
-    Drag the orange arrow around the edge of the circle to set the
-    wind <span class="font-semibold">source</span> direction.
-    The arrow points away from where the wind is coming from.
+    Drag the orange arrow around the outside.  
+    <span class="text-orange-300 font-semibold">Orange</span> = wind blowing TO.  
+    <span class="text-sky-300 font-semibold">Blue</span> = wind coming FROM.
   </p>
 
-  <!-- Drift info column at bottom -->
+  <!-- Drift info -->
   <div class="mt-1 grid grid-cols-2 gap-2 text-[10px]">
-    <div class="bg-gray-900 rounded-xl px-2 py-1">
-      <div class="text-gray-400">Drift (mil)</div>
-      <div class="font-semibold text-gray-100">
+    <div class="bg-gray-900/90 border border-emerald-500/70 rounded-xl px-2 py-2">
+      <div class="text-[10px] text-emerald-400 font-semibold">
+        Drift (mil)
+      </div>
+      <div class="text-[13px] text-gray-50 font-bold mt-1">
         {{ milDrift | number : '1.2-2' }}
       </div>
       <div class="text-[9px] text-gray-500 mt-0.5">
-        Full-value 10 mph ≈ 1 mil
+        Simple ballistic estimate using MV / BC / range.
       </div>
     </div>
-    <div class="bg-gray-900 rounded-xl px-2 py-1">
-      <div class="text-gray-400">Drift (MOA)</div>
-      <div class="font-semibold text-gray-100">
+
+    <div class="bg-gray-900/90 border border-sky-500/70 rounded-xl px-2 py-2">
+      <div class="text-[10px] text-sky-400 font-semibold">
+        Drift (MOA)
+      </div>
+      <div class="text-[13px] text-gray-50 font-bold mt-1">
         {{ moaDrift | number : '1.2-2' }}
       </div>
       <div class="text-[9px] text-gray-500 mt-0.5">
-        Based on {{ (milDrift | number:'1.2-2') }} mil
+        {{ windSpeedMph | number:'1.1-1' }} mph crosswind (effective).
       </div>
     </div>
   </div>

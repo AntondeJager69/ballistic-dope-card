@@ -4,10 +4,12 @@ import {
   OnInit,
   ViewChild,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-interface HourMarker {
+type WindUnit = 'mph' | 'mps' | 'kmh';
+
+interface WindHourMark {
   hour: number;
   tickX1: number;
   tickY1: number;
@@ -20,52 +22,140 @@ interface HourMarker {
 @Component({
   selector: 'app-wind-effect-tool',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DecimalPipe],
   templateUrl: './wind-effect-tool.component.html',
 })
 export class WindEffectToolComponent implements OnInit {
-  // Inputs
+  @ViewChild('circleArea', { static: true })
+  circleAreaRef!: ElementRef<HTMLDivElement>;
+
+  // --- Rifle / ballistic placeholders (later from Rifles tab) ---
+  rangeMeters = 600;          // m
+  muzzleVelocityFps = 2800;   // fps
+  ballisticCoeff = 0.5;       // G1
+
+  // --- Wind speed & units ---
+  // canonical value in mph
   windSpeedMph = 10;
-  windClock = 3; // 1–12
+  // current UI unit
+  windUnit: WindUnit = 'mph';
+  // value shown in the input (in current unit)
+  windSpeedInput = 10;
 
-  // Arrow rotation (0° = 12 o'clock / straight up)
-  arrowAngleDeg = 90; // default 3 o’clock
+  // --- Wind direction (clock) ---
+  windClock = 3;              // 1–12 clock
 
-  // SVG hour markers
-  hours: HourMarker[] = [];
+  // --- Arrow and clock rendering ---
+  arrowAngleDeg = 90;         // deg from top, clockwise
+  hours: WindHourMark[] = [];
 
-  // Pointer dragging state
-  private isDragging = false;
-  private activePointerId: number | null = null;
+  // --- POI dot position (for [attr.cx]/[attr.cy]) ---
+  poiX = 50;
+  poiY = 50;
 
-  @ViewChild('circleArea')
-  circleArea!: ElementRef<HTMLDivElement>;
+  // Pointer drag state
+  private dragging = false;
 
   ngOnInit(): void {
     this.buildHourMarkers();
     this.updateArrowFromClock();
+    // sync UI input from canonical mph
+    this.windSpeedInput = this.fromMph(this.windSpeedMph, this.windUnit);
+    this.updatePoiFromDrift();
   }
 
-  // Convert 1–12 clock to arrow rotation (arrow sits on outer edge and
-  // points outward FROM the wind direction)
-  private updateArrowFromClock(): void {
-    const normalized = ((this.windClock % 12) + 12) % 12; // 0–11
-    const angleFromTop = normalized * 30; // each hour = 30°
-    this.arrowAngleDeg = angleFromTop === 360 ? 0 : angleFromTop;
+  // =======================================
+  // Wind speed + unit conversion
+  // =======================================
+
+  onWindSpeedInputChange(raw: any): void {
+    const val = Number(raw);
+    if (!Number.isFinite(val)) {
+      this.windSpeedInput = 0;
+      this.windSpeedMph = 0;
+      this.updatePoiFromDrift();
+      return;
+    }
+    this.windSpeedInput = val;
+    this.windSpeedMph = this.toMph(val, this.windUnit);
+    this.updatePoiFromDrift();
   }
 
-  // Build hour ticks and labels around the circle
+  onWindUnitChange(raw: any): void {
+    const unit = (raw ?? 'mph') as WindUnit;
+    if (unit === this.windUnit) return;
+
+    // convert current canonical mph into new unit for display
+    this.windUnit = unit;
+    this.windSpeedInput = this.fromMph(this.windSpeedMph, unit);
+  }
+
+  private toMph(value: number, unit: WindUnit): number {
+    if (!Number.isFinite(value)) return 0;
+    switch (unit) {
+      case 'mph':
+        return value;
+      case 'kmh':
+        return value * 0.621371;
+      case 'mps':
+        return value * 2.23694;
+      default:
+        return value;
+    }
+  }
+
+  private fromMph(value: number, unit: WindUnit): number {
+    if (!Number.isFinite(value)) return 0;
+    switch (unit) {
+      case 'mph':
+        return value;
+      case 'kmh':
+        return value / 0.621371;
+      case 'mps':
+        return value / 2.23694;
+      default:
+        return value;
+    }
+  }
+
+  // =======================================
+  // Live wind label
+  // =======================================
+
+  get windLabel(): string {
+    const h = this.windClock;
+
+    if ([2, 3, 4].includes(h)) {
+      return 'Left → Right';
+    }
+    if ([8, 9, 10].includes(h)) {
+      return 'Right → Left';
+    }
+    if ([11, 12, 1].includes(h)) {
+      return 'Headwind';
+    }
+    if ([5, 6, 7].includes(h)) {
+      return 'Tailwind';
+    }
+    return '';
+  }
+
+  // =======================================
+  // Hour markers & arrow
+  // =======================================
+
   private buildHourMarkers(): void {
     const cx = 50;
     const cy = 50;
-    const innerR = 38;
-    const outerR = 42;
-    const labelR = 46;
+    const innerR = 36;
+    const outerR = 40;
+    const labelR = 44;
 
-    this.hours = [];
+    const result: WindHourMark[] = [];
+
     for (let hour = 1; hour <= 12; hour++) {
-      // angle from top (12 o'clock) increasing clockwise
-      const angleFromTop = hour * 30;
+      // angleFromTop: 0° at 12 o'clock, clockwise
+      const angleFromTop = (hour % 12) * 30;
       const angleFromRight = angleFromTop - 90;
       const rad = (angleFromRight * Math.PI) / 180;
 
@@ -76,7 +166,7 @@ export class WindEffectToolComponent implements OnInit {
       const labelX = cx + labelR * Math.cos(rad);
       const labelY = cy + labelR * Math.sin(rad);
 
-      this.hours.push({
+      result.push({
         hour,
         tickX1,
         tickY1,
@@ -86,94 +176,69 @@ export class WindEffectToolComponent implements OnInit {
         labelY,
       });
     }
+
+    this.hours = result;
   }
 
-  // --- Pointer / dragging logic ---
+  private updateArrowFromClock(): void {
+    const angleFromTop = (this.windClock % 12) * 30;
+    this.arrowAngleDeg = angleFromTop === 360 ? 0 : angleFromTop;
+  }
+
+  // =======================================
+  // Pointer dragging
+  // =======================================
 
   startDrag(event: PointerEvent): void {
-    this.isDragging = true;
-    this.activePointerId = event.pointerId;
-
-    (event.target as HTMLElement).setPointerCapture(event.pointerId);
-
+    if (!this.circleAreaRef?.nativeElement) return;
+    this.dragging = true;
+    this.circleAreaRef.nativeElement.setPointerCapture(event.pointerId);
     this.updateDirectionFromPointer(event);
   }
 
   onDrag(event: PointerEvent): void {
-    if (!this.isDragging || this.activePointerId !== event.pointerId) {
-      return;
-    }
+    if (!this.dragging) return;
     this.updateDirectionFromPointer(event);
   }
 
-  endDrag(event?: PointerEvent): void {
-    if (
-      event &&
-      this.activePointerId !== null &&
-      event.pointerId !== this.activePointerId
-    ) {
-      return;
+  endDrag(event: PointerEvent): void {
+    if (!this.dragging) return;
+    this.dragging = false;
+    try {
+      this.circleAreaRef.nativeElement.releasePointerCapture(event.pointerId);
+    } catch {
+      // ignore if capture wasn't set
     }
-    this.isDragging = false;
-    this.activePointerId = null;
   }
 
   private updateDirectionFromPointer(event: PointerEvent): void {
-    if (!this.circleArea) return;
-
-    const rect = this.circleArea.nativeElement.getBoundingClientRect();
+    const rect = this.circleAreaRef.nativeElement.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
 
     const dx = event.clientX - cx;
     const dy = event.clientY - cy;
 
-    // angleFromRight: 0° at +X (right), 90° at +Y (down)
+    // angleFromRight: 0° at +X; want angleFromTop (12 o'clock), clockwise
     const angleFromRight = (Math.atan2(dy, dx) * 180) / Math.PI;
-
-    // Convert to angle from top (12 o'clock), clockwise 0–360
     let angleFromTop = angleFromRight + 90;
     angleFromTop = (angleFromTop + 360) % 360;
 
-    // Convert angle to nearest hour (1–12)
-    const raw = Math.round(angleFromTop / 30) % 12; // 0–11
-    const hour = raw === 0 ? 12 : raw;
-
+    // map to nearest hour
+    const sector = Math.round(angleFromTop / 30) % 12; // 0–11
+    const hour = sector === 0 ? 12 : sector;
     this.windClock = hour;
+
     this.updateArrowFromClock();
+    this.updatePoiFromDrift();
   }
 
-  // --- POI red-dot position (visual only) ---
-
-  get poiX(): number {
-    const { radius, radFromTop } = this.getPoiGeometry();
-    return 50 + radius * Math.sin(radFromTop);
-  }
-
-  get poiY(): number {
-    const { radius, radFromTop } = this.getPoiGeometry();
-    return 50 - radius * Math.cos(radFromTop);
-  }
-
-  private getPoiGeometry(): { radius: number; radFromTop: number } {
-    const maxRadius = 18;
-    const minRadius = 4;
-
-    const clampedSpeed = Math.max(0, Math.min(this.windSpeedMph, 30));
-    const fraction = clampedSpeed / 30; // 0–1
-
-    const radius = minRadius + (maxRadius - minRadius) * fraction;
-    const angleFromTopDeg = (this.windClock % 12) * 30;
-    const radFromTop = (angleFromTopDeg * Math.PI) / 180;
-
-    return { radius, radFromTop };
-  }
-
-  // --- Simple drift model (reference only) ---
-  //  Full-value 10 mph ≈ 1.0 mil, MOA = mil * 3.438
+  // =======================================
+  // Simple drift model + POI dot
+  // =======================================
 
   private getCrosswindFactor(clock: number): number {
-    // 3 / 9 = full value, 2 / 4 / 8 / 10 ≈ 0.87, 1 / 5 / 7 / 11 ≈ 0.5, 6 / 12 = 0
+    // 3 / 9 = full value, 2 / 4 / 8 / 10 ≈ 0.87, 1 / 5 / 7 / 11 ≈ 0.5
     const map: Record<number, number> = {
       3: 1,
       9: 1,
@@ -191,12 +256,68 @@ export class WindEffectToolComponent implements OnInit {
     return map[clock] ?? 0;
   }
 
+  private mphToFps(speedMph: number): number {
+    return speedMph * 1.46667;
+  }
+
+  private metersToFeet(meters: number): number {
+    return meters * 3.28084;
+  }
+
+  private get timeOfFlightSeconds(): number {
+    const v = this.muzzleVelocityFps || 1;
+    const distanceFt = this.metersToFeet(this.rangeMeters);
+    return distanceFt / v;
+  }
+
   get milDrift(): number {
+    if (this.rangeMeters <= 0 || this.muzzleVelocityFps <= 0) return 0;
+
     const factor = this.getCrosswindFactor(this.windClock);
-    return (this.windSpeedMph / 10) * factor;
+    if (!factor) return 0;
+
+    const effectiveMph = this.windSpeedMph * factor;
+    if (!effectiveMph) return 0;
+
+    const windFps = this.mphToFps(effectiveMph);
+    const tof = this.timeOfFlightSeconds;
+
+    const lateralFeet = windFps * tof;
+    const lateralInches = lateralFeet * 12;
+    const rangeInches = this.rangeMeters * 39.3701;
+    if (rangeInches <= 0) return 0;
+
+    const angleRad = lateralInches / rangeInches;
+    let mils = angleRad / 0.001;
+
+    const bc = this.ballisticCoeff || 0.5;
+    mils = mils / (bc / 0.5);
+
+    return mils;
   }
 
   get moaDrift(): number {
     return this.milDrift * 3.438;
+  }
+
+  private updatePoiFromDrift(): void {
+    const centerX = 50;
+    const centerY = 50;
+
+    const driftMil = this.milDrift;
+    const factor = this.getCrosswindFactor(this.windClock);
+    const sign =
+      [3, 2, 4, 1, 5].includes(this.windClock) ? 1 :
+      [9, 8, 10, 7, 11].includes(this.windClock) ? -1 : 0;
+
+    // clamp drift for visual
+    const clamped = Math.max(-2, Math.min(2, driftMil * factor));
+    const pixelsPerMil = 4;
+
+    const dx = sign * clamped * pixelsPerMil;
+    const dy = 0;
+
+    this.poiX = centerX + dx;
+    this.poiY = centerY + dy;
   }
 }

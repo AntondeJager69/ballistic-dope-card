@@ -42,11 +42,11 @@ export class WindEffectToolComponent implements OnInit {
   // value shown in the input (in current unit)
   windSpeedInput = 10;
 
-  // --- Wind direction (clock) ---
+  // --- Wind direction (clock) – this is the TO direction (orange arrow) ---
   windClock = 3;              // 1–12 clock
 
   // --- Arrow and clock rendering ---
-  arrowAngleDeg = 90;         // deg from top, clockwise
+  arrowAngleDeg = 90;         // deg from top, clockwise (TO direction)
   hours: WindHourMark[] = [];
 
   // --- POI dot position (for [attr.cx]/[attr.cy]) ---
@@ -119,11 +119,17 @@ export class WindEffectToolComponent implements OnInit {
   }
 
   // =======================================
-  // Live wind label
+  // FROM direction helpers
   // =======================================
 
+  // Opposite side of the TO direction (blue arrow)
+  get windFromClock(): number {
+    // +6 hours = 180° opposite
+    return ((this.windClock + 6 - 1) % 12) + 1;
+  }
+
   get windLabel(): string {
-    const h = this.windClock;
+    const h = this.windFromClock;
 
     if ([2, 3, 4].includes(h)) {
       return 'Left → Right';
@@ -224,7 +230,7 @@ export class WindEffectToolComponent implements OnInit {
     let angleFromTop = angleFromRight + 90;
     angleFromTop = (angleFromTop + 360) % 360;
 
-    // map to nearest hour
+    // map to nearest hour (TO direction)
     const sector = Math.round(angleFromTop / 30) % 12; // 0–11
     const hour = sector === 0 ? 12 : sector;
     this.windClock = hour;

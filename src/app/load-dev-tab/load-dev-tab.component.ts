@@ -471,60 +471,64 @@ throw new Error('Method not implemented.');
 }
 
   saveProject(): void {
-    if (!this.selectedRifleId || !this.projectForm.name.trim()) {
-      alert('Please select rifle and enter a name for the load development.');
-      return;
-    }
-
-    const type: LoadDevType = (this.projectForm.type as LoadDevType) || 'ladder';
-
-    this.postSaveMessage = null;
-
-    if (this.editingProject) {
-      const updated: LoadDevProject = {
-        ...this.editingProject,
-        rifleId: this.selectedRifleId,
-        name: this.projectForm.name.trim(),
-        type,
-        notes: this.projectForm.notes.trim()
-      };
-      this.data.updateLoadDevProject(updated);
-      this.selectedProjectId = updated.id;
-
-      this.postSaveMessage =
-        'Load development updated. Use the wizard to enter velocities, view the graph and see the highlighted nodes.';
-    } else {
-      const newProject: LoadDevProject = {
-        id: Date.now(),
-        rifleId: this.selectedRifleId,
-        name: this.projectForm.name.trim(),
-        type,
-        notes: this.projectForm.notes.trim() || undefined,
-        dateStarted: new Date().toISOString(),
-        entries: []
-      };
-      this.data.updateLoadDevProject(newProject);
-      this.selectedProjectId = newProject.id;
-
-      this.createLadderEntriesFromPlanner(newProject.id);
-      this.data.createSessionForLoadDevProject(newProject);
-
-      this.postSaveMessage =
-        'Load development planned and saved. Use the wizard to step through data entry, graph view and node highlights.';
-    }
-
-    setTimeout(() => {
-      this.postSaveMessage = null;
-    }, 15000);
-
-    this.projectFormVisible = false;
-    this.editingProject = null;
-    this.projectForm = this.createEmptyProjectForm();
-    this.planner = this.createEmptyPlannerForm();
-    this.showNotesPanel = false;
-    this.loadProjects();
-    this.resetWizard();
+  if (!this.selectedRifleId || !this.projectForm.name.trim()) {
+    alert('Please select rifle and enter a name for the load development.');
+    return;
   }
+
+  const type: LoadDevType = (this.projectForm.type as LoadDevType) || 'ladder';
+
+  this.postSaveMessage = null;
+
+  if (this.editingProject) {
+    const updated: LoadDevProject = {
+      ...this.editingProject,
+      rifleId: this.selectedRifleId,
+      name: this.projectForm.name.trim(),
+      type,
+      notes: this.projectForm.notes.trim()
+    };
+    this.data.updateLoadDevProject(updated);
+    this.selectedProjectId = updated.id;
+
+    this.postSaveMessage =
+      'Load development updated. Use the wizard to enter velocities, view the graph and see the highlighted nodes.';
+  } else {
+    const newProject: LoadDevProject = {
+      id: Date.now(),
+      rifleId: this.selectedRifleId,
+      name: this.projectForm.name.trim(),
+      type,
+      notes: this.projectForm.notes.trim() || undefined,
+      dateStarted: new Date().toISOString(),
+      entries: []
+    };
+    this.data.updateLoadDevProject(newProject);
+    this.selectedProjectId = newProject.id;
+
+    // Create ladder/OCW entries from planner (charges + default shots)
+    this.createLadderEntriesFromPlanner(newProject.id);
+    // Also create a session linked to this load dev
+    this.data.createSessionForLoadDevProject(newProject);
+
+    this.postSaveMessage =
+      type === 'ocw'
+        ? 'OCW planned and saved. Go shoot your groups, then come back here and use the OCW wizard or Edit buttons to enter velocities.'
+        : 'Ladder test planned and saved. Go shoot the ladder, then come back here and use the wizard or Edit buttons to enter velocities and view the graph with node highlights.';
+  }
+
+  setTimeout(() => {
+    this.postSaveMessage = null;
+  }, 15000);
+
+  this.projectFormVisible = false;
+  this.editingProject = null;
+  this.projectForm = this.createEmptyProjectForm();
+  this.planner = this.createEmptyPlannerForm();
+  this.showNotesPanel = false;
+  this.loadProjects();
+  this.resetWizard();
+}
 
   deleteProject(project: LoadDevProject): void {
     if (!confirm(`Delete project "${project.name}"?`)) return;
@@ -773,18 +777,18 @@ throw new Error('Method not implemented.');
   }
 
   private appendVelocityToEntry(entry: LoadDevEntry, value: number): void {
-    if (!this.selectedProject) return;
+  if (!this.selectedProject) return;
 
-    const any = entry as any;
-    const existing = this.parseVelocityInput(any.velocityInput);
-    const updated = [...existing, value];
+  const any = entry as any;
+  const existing = this.parseVelocityInput(any.velocityInput);
+  const updated = [...existing, value];
 
-    any.velocityInput = updated.join(' ');
-    entry.shotsFired = updated.length;
+  any.velocityInput = updated.join(' ');
+  entry.shotsFired = updated.length;
 
-    this.data.updateLoadDevEntry(this.selectedProject.id, entry);
-    this.refreshSelectedProject();
-  }
+  this.data.updateLoadDevEntry(this.selectedProject.id, entry);
+  this.refreshSelectedProject();
+}
 
   // ---------- graph data builder ----------
 
@@ -848,35 +852,44 @@ throw new Error('Method not implemented.');
   // ---------- ladder wizard ----------
 
   startLadderWizard(): void {
-    if (!this.selectedProject || this.selectedProject.type !== 'ladder') {
-      alert('This is not a ladder test');
-      return;
-      
-    }
-
-    if (this.allEntriesHaveVelocity()) {
-      alert(
-        'All ladder steps already have velocities. Use the Edit buttons for changes.'
-      );
-      return;
-    }
-
-    const entries = [...(this.selectedProject.entries ?? [])].sort(
-      (a, b) => (a.chargeGr ?? 9999) - (b.chargeGr ?? 9999)
-    );
-
-    if (!entries.length) {
-      alert('No ladder entries created');
-      return;
-    }
-
-    this.ladderWizardEntries = entries;
-    this.ladderWizardIndex = 0;
-    this.ladderWizardActive = true;
-    this.singleVelocityEditActive = false;
-
-    this.setWizardCurrentEntry();
+  if (!this.selectedProject) {
+    alert('Select a load development first.');
+    return;
   }
+
+  // Wizard is valid for ladder and OCW
+  if (
+    this.selectedProject.type !== 'ladder' &&
+    this.selectedProject.type !== 'ocw'
+  ) {
+    alert('The velocity wizard is only available for ladder and OCW developments.');
+    return;
+  }
+
+  if (this.allEntriesHaveVelocity()) {
+    alert(
+      'All steps already have velocities. Use the Edit buttons for changes.'
+    );
+    return;
+  }
+
+  const entries = [...(this.selectedProject.entries ?? [])].sort(
+    (a, b) => (a.chargeGr ?? 9999) - (b.chargeGr ?? 9999)
+  );
+
+  if (!entries.length) {
+    alert('No entries created for this development yet.');
+    return;
+  }
+
+  this.ladderWizardEntries = entries;
+  this.ladderWizardIndex = 0;
+  this.ladderWizardActive = true;
+  this.singleVelocityEditActive = false;
+
+  this.setWizardCurrentEntry();
+}
+
 
   private setWizardCurrentEntry(): void {
     if (!this.ladderWizardActive) return;
@@ -926,31 +939,52 @@ throw new Error('Method not implemented.');
   }
 
   saveVelocityAndNext(): void {
-    if (!this.selectedProject || !this.velocityEditEntry) return;
+  if (!this.selectedProject || !this.velocityEditEntry) return;
 
-    const raw = this.velocityEditValue ?? '';
-    const trimmed = raw.toString().trim();
+  const raw = this.velocityEditValue ?? '';
+  const trimmed = raw.toString().trim();
 
-    if (trimmed) {
-      const v = Number(trimmed);
-      if (Number.isFinite(v) && v > 0) {
-        this.appendVelocityToEntry(this.velocityEditEntry, v);
-      } else {
-        alert('Invalid velocity');
+  if (trimmed) {
+    const values = this.parseVelocityInput(trimmed);
+    if (!values.length) {
+      alert(
+        'Enter one or more numeric velocities, separated by spaces or commas.'
+      );
+      return;
+    }
+
+    // For OCW: enforce planned shots per charge if we have it
+    if (this.selectedProject.type === 'ocw') {
+      const plannedShots =
+        this.velocityEditEntry.shotsFired ?? this.planner.shotsPerGroup ?? null;
+
+      if (plannedShots && values.length !== plannedShots) {
+        alert(
+          `You planned ${plannedShots} shots for this charge. Enter exactly ${plannedShots} velocities, or leave the field blank and press Skip if you have not shot this group yet.`
+        );
         return;
       }
     }
 
-    this.goToNextWizardEntry();
+    const any = this.velocityEditEntry as any;
+    any.velocityInput = values.join(' ');
+    this.velocityEditEntry.shotsFired = values.length;
+
+    this.data.updateLoadDevEntry(this.selectedProject.id, this.velocityEditEntry);
+    this.refreshSelectedProject();
   }
 
-  skipVelocityAndNext(): void {
-    this.goToNextWizardEntry();
-  }
+  this.goToNextWizardEntry();
+}
 
-  cancelLadderWizard(): void {
-    this.finishLadderWizard();
-  }
+skipVelocityAndNext(): void {
+  // no save, just move on to the next charge
+  this.goToNextWizardEntry();
+}
+
+cancelLadderWizard(): void {
+  this.finishLadderWizard();
+}
 
   // ---------- single-row velocity edit (replace set) ----------
 

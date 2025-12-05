@@ -1,80 +1,61 @@
 <div class="w-full h-full flex flex-col gap-3 text-gray-100 text-[11px]">
 
-  <!-- Rifle / ballistics (placeholder now, rifle data later) -->
+  <!-- Rifle / wind from -->
   <div class="bg-gray-900/70 border border-gray-700 rounded-xl p-2">
-    <div class="text-[10px] text-gray-400">
-      Rifle / ballistics (from Rifles tab later)
-    </div>
-    <div class="grid grid-cols-3 gap-2 mt-1">
-      <!-- Range -->
+    <div class="grid grid-cols-3 gap-2">
       <div>
         <div class="text-[9px] text-gray-400">Range (m)</div>
         <input
           type="number"
           [(ngModel)]="rangeMeters"
           class="w-full bg-black border border-gray-700 rounded-lg px-2 py-0.5 text-[10px]"
-          min="0"
-          step="10"
         />
       </div>
 
-      <!-- MV -->
       <div>
         <div class="text-[9px] text-gray-400">MV (fps)</div>
         <input
           type="number"
           [(ngModel)]="muzzleVelocityFps"
           class="w-full bg-black border border-gray-700 rounded-lg px-2 py-0.5 text-[10px]"
-          min="0"
-          step="10"
         />
       </div>
 
-      <!-- Wind FROM (clock) – show FROM side only -->
       <div>
         <div class="text-[9px] text-gray-400">Wind from</div>
         <div
-          class="w-full bg-black border border-gray-700 rounded-lg px-2 py-0.5 text-[10px] flex items-center justify-center"
+          class="w-full bg-black border border-gray-700 rounded-lg px-2 py-0.5 text-[10px] text-center font-semibold"
         >
-          <span class="font-semibold text-gray-100">
-            {{ windFromClock }}
-          </span>
+          {{ windFromClock }}
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Wind speed card -->
+  <!-- Wind speed -->
   <div class="bg-gray-900/70 border border-gray-700 rounded-xl p-2">
-    <div class="text-[10px] text-gray-300 mb-1">
-      Wind speed
-    </div>
+    <div class="text-[10px] text-gray-300 mb-1">Wind speed</div>
     <div class="flex items-center gap-2">
-      <div class="flex-1">
-        <input
-          type="number"
-          [ngModel]="windSpeedInput"
-          (ngModelChange)="onWindSpeedInputChange($event)"
-          class="w-full bg-black border border-gray-700 rounded-lg px-2 py-1 text-[11px]"
-          min="0"
-          step="0.1"
-        />
-      </div>
-      <div>
-        <select
-          [ngModel]="windUnit"
-          (ngModelChange)="onWindUnitChange($event)"
-          class="w-20 bg-black border border-gray-700 rounded-lg px-1.5 py-1 text-[10px]"
-        >
-          <option value="mph">mph</option>
-          <option value="kmh">km/h</option>
-          <option value="mps">m/s</option>
-        </select>
-      </div>
+      <input
+        type="number"
+        [ngModel]="windSpeedInput"
+        (ngModelChange)="onWindSpeedInputChange($event)"
+        class="flex-1 bg-black border border-gray-700 rounded-lg px-2 py-1 text-[11px]"
+      />
+
+      <select
+        [ngModel]="windUnit"
+        (ngModelChange)="onWindUnitChange($event)"
+        class="w-20 bg-black border border-gray-700 rounded-lg px-1.5 py-1 text-[10px]"
+      >
+        <option value="mph">mph</option>
+        <option value="kmh">km/h</option>
+        <option value="mps">m/s</option>
+      </select>
     </div>
   </div>
 
-  <!-- Clock + arrows + impact dot -->
+  <!-- Wind dial -->
   <div
     #circleArea
     class="relative w-full max-w-xs mx-auto aspect-square select-none touch-none"
@@ -85,99 +66,61 @@
     (pointerleave)="endDrag($event)"
   >
     <svg viewBox="0 0 100 100" class="w-full h-full">
-      <!-- Outer circle -->
+
+      <!-- Outer & inner rings -->
       <circle
-        cx="50"
-        cy="50"
-        r="40"
+        cx="50" cy="50" r="40"
         class="fill-[#020617] stroke-gray-600"
         stroke-width="1.5"
       ></circle>
-
-      <!-- Inner circle (impact zone) -->
       <circle
-        cx="50"
-        cy="50"
-        r="22"
+        cx="50" cy="50" r="22"
         class="fill-[#020617] stroke-gray-700"
         stroke-width="0.8"
       ></circle>
 
       <!-- Crosshair -->
-      <line
-        x1="50"
-        y1="18"
-        x2="50"
-        y2="82"
-        class="stroke-gray-700"
-        stroke-width="0.6"
-      ></line>
-      <line
-        x1="18"
-        y1="50"
-        x2="82"
-        y2="50"
-        class="stroke-gray-700"
-        stroke-width="0.6"
-      ></line>
+      <line x1="50" y1="18" x2="50" y2="82" class="stroke-gray-700" stroke-width="0.6"></line>
+      <line x1="18" y1="50" x2="82" y2="50" class="stroke-gray-700" stroke-width="0.6"></line>
 
       <!-- Hour ticks + labels -->
       <ng-container *ngFor="let h of hours">
         <line
-          [attr.x1]="h.tickX1"
-          [attr.y1]="h.tickY1"
-          [attr.x2]="h.tickX2"
-          [attr.y2]="h.tickY2"
-          class="stroke-gray-500"
-          stroke-width="0.6"
+          [attr.x1]="h.tickX1" [attr.y1]="h.tickY1"
+          [attr.x2]="h.tickX2" [attr.y2]="h.tickY2"
+          class="stroke-gray-500" stroke-width="0.6"
         ></line>
+
         <text
           [attr.x]="h.labelX"
           [attr.y]="h.labelY"
           text-anchor="middle"
           alignment-baseline="middle"
           class="fill-gray-300"
-          font-size="6"
-        >
+          font-size="6">
           {{ h.hour }}
         </text>
       </ng-container>
 
-      <!-- ORANGE arrow (wind TO) -->
-      <g [attr.transform]="'rotate(' + arrowAngleDeg + ' 50 50)'">
+      <!-- ORANGE arrow – tail on outer ring, tip toward center (stops short) -->
+      <g [attr.transform]="'rotate(' + (arrowAngleDeg + 180) + ' 50 50)'">
+        <!-- Tail at outer ring, shaft inward -->
         <line
-          x1="50"
-          y1="20"
-          x2="50"
-          y2="7"
+          x1="50" y1="16"
+          x2="50" y2="36"
           class="stroke-orange-400"
           stroke-width="2.8"
           stroke-linecap="round"
         ></line>
+
+        <!-- Arrowhead pointing toward center, stopping short of (50,50) -->
         <polygon
-          points="50,4 44,10 56,10"
+          points="50,40 46,34 54,34"
           class="fill-orange-400"
         ></polygon>
       </g>
 
-      <!-- BLUE arrow (wind FROM) – opposite side of orange -->
-      <g [attr.transform]="'rotate(' + (arrowAngleDeg + 180) + ' 50 50)'">
-        <line
-          x1="50"
-          y1="30"
-          x2="50"
-          y2="20"
-          class="stroke-sky-400"
-          stroke-width="2"
-          stroke-linecap="round"
-        ></line>
-        <polygon
-          points="50,17 46,23 54,23"
-          class="fill-sky-400"
-        ></polygon>
-      </g>
-
-      <!-- Impact / POI dot -->
+      <!-- POI dot (red) – position driven by drift -->
       <circle
         [attr.cx]="poiX"
         [attr.cy]="poiY"
@@ -187,24 +130,70 @@
     </svg>
   </div>
 
-  <!-- Compact drift summary (no estimate text) -->
+  <!-- Drift result cards -->
   <div class="grid grid-cols-2 gap-2 mt-1">
-    <div class="bg-gray-900/90 border border-emerald-500/70 rounded-xl px-2 py-1.5">
-      <div class="text-[10px] text-emerald-400 font-semibold">
-        Drift (mil)
+    <!-- Mil + cm -->
+    <div class="bg-gray-900/90 border border-emerald-500/70 rounded-xl px-2 py-1">
+      <!-- header -->
+      <div class="flex items-center text-[9px] font-semibold">
+        <span class="flex-1 text-emerald-400">
+          Drift (mil)
+        </span>
+        <span class="flex-1 text-emerald-300 text-right">
+          Drift (cm)
+        </span>
       </div>
-      <div class="text-[13px] text-gray-50 font-bold mt-0.5">
-        {{ milDrift | number : '1.2-2' }}
+      <!-- thin horizontal separator -->
+      <div class="h-px bg-gray-800 my-0.5"></div>
+      <!-- values -->
+      <div class="flex items-baseline text-[12px] text-gray-50 font-bold">
+        <span class="flex-1">
+          {{ milDrift | number : '1.2-2' }}
+        </span>
+        <!-- thin vertical separator -->
+        <span class="w-px h-4 bg-gray-700 mx-1"></span>
+        <span class="flex-1 text-right">
+          {{ driftCm | number : '1.1-1' }}
+        </span>
       </div>
     </div>
 
-    <div class="bg-gray-900/90 border border-sky-500/70 rounded-xl px-2 py-1.5">
-      <div class="text-[10px] text-sky-400 font-semibold">
-        Drift (MOA)
+    <!-- MOA + inch -->
+    <div class="bg-gray-900/90 border border-sky-500/70 rounded-xl px-2 py-1">
+      <!-- header -->
+      <div class="flex items-center text-[9px] font-semibold">
+        <span class="flex-1 text-sky-400">
+          Drift (MOA)
+        </span>
+        <span class="flex-1 text-sky-300 text-right">
+          Drift (inch)
+        </span>
       </div>
-      <div class="text-[13px] text-gray-50 font-bold mt-0.5">
-        {{ moaDrift | number : '1.2-2' }}
+      <!-- thin horizontal separator -->
+      <div class="h-px bg-gray-800 my-0.5"></div>
+      <!-- values -->
+      <div class="flex items-baseline text-[12px] text-gray-50 font-bold">
+        <span class="flex-1">
+          {{ moaDrift | number : '1.2-2' }}
+        </span>
+        <!-- thin vertical separator -->
+        <span class="w-px h-4 bg-gray-700 mx-1"></span>
+        <span class="flex-1 text-right">
+          {{ driftInches | number : '1.2-2' }}
+        </span>
       </div>
     </div>
   </div>
+
+  <!-- Bottom Back button -->
+  <div class="mt-3 flex justify-end">
+    <button
+      type="button"
+      class="px-4 py-1.5 rounded-2xl bg-orange-500 text-black font-semibold text-[11px]"
+      (click)="goBack()"
+    >
+      Back
+    </button>
+  </div>
+
 </div>

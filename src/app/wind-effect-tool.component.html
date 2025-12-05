@@ -1,8 +1,8 @@
 <div class="w-full h-full flex flex-col gap-3 text-gray-100 text-[11px]">
 
-  <!-- Rifle / wind from -->
+  <!-- Top inputs: Range / MV / Wind from / Wind speed -->
   <div class="bg-gray-900/70 border border-gray-700 rounded-xl p-2">
-    <div class="grid grid-cols-3 gap-2">
+    <div class="grid grid-cols-4 gap-2">
       <div>
         <div class="text-[9px] text-gray-400">Range (m)</div>
         <input
@@ -29,29 +29,28 @@
           {{ windFromClock }}
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- Wind speed -->
-  <div class="bg-gray-900/70 border border-gray-700 rounded-xl p-2">
-    <div class="text-[10px] text-gray-300 mb-1">Wind speed</div>
-    <div class="flex items-center gap-2">
-      <input
-        type="number"
-        [ngModel]="windSpeedInput"
-        (ngModelChange)="onWindSpeedInputChange($event)"
-        class="flex-1 bg-black border border-gray-700 rounded-lg px-2 py-1 text-[11px]"
-      />
-
-      <select
-        [ngModel]="windUnit"
-        (ngModelChange)="onWindUnitChange($event)"
-        class="w-20 bg-black border border-gray-700 rounded-lg px-1.5 py-1 text-[10px]"
-      >
-        <option value="mph">mph</option>
-        <option value="kmh">km/h</option>
-        <option value="mps">m/s</option>
-      </select>
+      <!-- Wind speed moved up next to the others -->
+      <div>
+        <div class="text-[9px] text-gray-400">Wind speed</div>
+        <div class="flex items-center gap-1">
+          <input
+            type="number"
+            [ngModel]="windSpeedInput"
+            (ngModelChange)="onWindSpeedInputChange($event)"
+            class="flex-1 bg-black border border-gray-700 rounded-lg px-2 py-0.5 text-[10px]"
+          />
+          <select
+            [ngModel]="windUnit"
+            (ngModelChange)="onWindUnitChange($event)"
+            class="w-14 bg-black border border-gray-700 rounded-lg px-1 py-0.5 text-[9px]"
+          >
+            <option value="mph">mph</option>
+            <option value="kmh">km/h</option>
+            <option value="mps">m/s</option>
+          </select>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -183,17 +182,6 @@
         </span>
       </div>
     </div>
-  </div>
-
-  <!-- Bottom Back button -->
-  <div class="mt-3 flex justify-end">
-    <button
-      type="button"
-      class="px-4 py-1.5 rounded-2xl bg-orange-500 text-black font-semibold text-[11px]"
-      (click)="goBack()"
-    >
-      Back
-    </button>
   </div>
 
 </div>

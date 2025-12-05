@@ -1,8 +1,24 @@
 <div class="w-full h-full flex flex-col gap-3 text-gray-100 text-[11px]">
 
-  <!-- Top inputs: Range / MV / Wind from / Wind speed -->
+  <!-- Choose rifle -->
   <div class="bg-gray-900/70 border border-gray-700 rounded-xl p-2">
-    <div class="grid grid-cols-4 gap-2">
+    <div class="text-[9px] text-gray-400 mb-1">Rifle</div>
+    <select
+      class="w-full bg-black border border-gray-700 rounded-lg px-2 py-1 text-[10px]"
+      [(ngModel)]="selectedRifleId"
+      (ngModelChange)="onRifleChanged($event)"
+    >
+      <option [ngValue]="null">Choose rifle</option>
+      <option *ngFor="let r of rifles" [ngValue]="r.id ?? r.rifleId">
+        {{ r.name || r.label || ('Rifle ' + (r.id ?? r.rifleId)) }}
+      </option>
+    </select>
+  </div>
+
+  <!-- Rifle / wind from -->
+
+  <div class="bg-gray-900/70 border border-gray-700 rounded-xl p-2">
+    <div class="grid grid-cols-3 gap-2">
       <div>
         <div class="text-[9px] text-gray-400">Range (m)</div>
         <input
@@ -29,28 +45,29 @@
           {{ windFromClock }}
         </div>
       </div>
+    </div>
+  </div>
 
-      <!-- Wind speed moved up next to the others -->
-      <div>
-        <div class="text-[9px] text-gray-400">Wind speed</div>
-        <div class="flex items-center gap-1">
-          <input
-            type="number"
-            [ngModel]="windSpeedInput"
-            (ngModelChange)="onWindSpeedInputChange($event)"
-            class="flex-1 bg-black border border-gray-700 rounded-lg px-2 py-0.5 text-[10px]"
-          />
-          <select
-            [ngModel]="windUnit"
-            (ngModelChange)="onWindUnitChange($event)"
-            class="w-14 bg-black border border-gray-700 rounded-lg px-1 py-0.5 text-[9px]"
-          >
-            <option value="mph">mph</option>
-            <option value="kmh">km/h</option>
-            <option value="mps">m/s</option>
-          </select>
-        </div>
-      </div>
+  <!-- Wind speed -->
+  <div class="bg-gray-900/70 border border-gray-700 rounded-xl p-2">
+    <div class="text-[10px] text-gray-300 mb-1">Wind speed</div>
+
+    <div class="flex items-center gap-2">
+      <input
+        type="number"
+        [ngModel]="windSpeedInput"
+        (ngModelChange)="onWindSpeedInputChange($event)"
+        class="flex-1 bg-black border border-gray-700 rounded-lg px-2 py-1 text-[11px]"
+      />
+      <select
+        [ngModel]="windUnit"
+        (ngModelChange)="onWindUnitChange($event)"
+        class="w-16 bg-black border border-gray-700 rounded-lg px-1 py-1 text-[10px]"
+      >
+        <option value="mph">mph</option>
+        <option value="kmh">km/h</option>
+        <option value="mps">m/s</option>
+      </select>
     </div>
   </div>
 
@@ -101,9 +118,8 @@
         </text>
       </ng-container>
 
-      <!-- ORANGE arrow – tail on outer ring, tip toward center (stops short) -->
+      <!-- ORANGE arrow – tail on outer ring, tip toward center -->
       <g [attr.transform]="'rotate(' + (arrowAngleDeg + 180) + ' 50 50)'">
-        <!-- Tail at outer ring, shaft inward -->
         <line
           x1="50" y1="16"
           x2="50" y2="36"
@@ -112,7 +128,6 @@
           stroke-linecap="round"
         ></line>
 
-        <!-- Arrowhead pointing toward center, stopping short of (50,50) -->
         <polygon
           points="50,40 46,34 54,34"
           class="fill-orange-400"
@@ -133,7 +148,6 @@
   <div class="grid grid-cols-2 gap-2 mt-1">
     <!-- Mil + cm -->
     <div class="bg-gray-900/90 border border-emerald-500/70 rounded-xl px-2 py-1">
-      <!-- header -->
       <div class="flex items-center text-[9px] font-semibold">
         <span class="flex-1 text-emerald-400">
           Drift (mil)
@@ -142,14 +156,11 @@
           Drift (cm)
         </span>
       </div>
-      <!-- thin horizontal separator -->
       <div class="h-px bg-gray-800 my-0.5"></div>
-      <!-- values -->
       <div class="flex items-baseline text-[12px] text-gray-50 font-bold">
         <span class="flex-1">
           {{ milDrift | number : '1.2-2' }}
         </span>
-        <!-- thin vertical separator -->
         <span class="w-px h-4 bg-gray-700 mx-1"></span>
         <span class="flex-1 text-right">
           {{ driftCm | number : '1.1-1' }}
@@ -159,7 +170,6 @@
 
     <!-- MOA + inch -->
     <div class="bg-gray-900/90 border border-sky-500/70 rounded-xl px-2 py-1">
-      <!-- header -->
       <div class="flex items-center text-[9px] font-semibold">
         <span class="flex-1 text-sky-400">
           Drift (MOA)
@@ -168,14 +178,11 @@
           Drift (inch)
         </span>
       </div>
-      <!-- thin horizontal separator -->
       <div class="h-px bg-gray-800 my-0.5"></div>
-      <!-- values -->
       <div class="flex items-baseline text-[12px] text-gray-50 font-bold">
         <span class="flex-1">
           {{ moaDrift | number : '1.2-2' }}
         </span>
-        <!-- thin vertical separator -->
         <span class="w-px h-4 bg-gray-700 mx-1"></span>
         <span class="flex-1 text-right">
           {{ driftInches | number : '1.2-2' }}

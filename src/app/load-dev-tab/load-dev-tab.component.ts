@@ -2,6 +2,10 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../data.service';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
@@ -416,6 +420,36 @@ exportProjectToPdf(): void {
   toggleNotesPanel(): void {
     this.showNotesPanel = !this.showNotesPanel;
   }
+private async savePdfNative(doc: jsPDF, filename: string): Promise<void> {
+  try {
+    // Get base64 data (without the "data:application/pdf;base64," prefix)
+    const dataUrl = doc.output('datauristring');
+    const base64 = dataUrl.split(',')[1];
+
+    const path = `gunstuff/${filename}`;
+
+    // Write to the app's Documents directory
+    const result = await Filesystem.writeFile({
+      path,
+      data: base64,
+      directory: Directory.Documents,
+      recursive: true
+    });
+
+    // Open share sheet so you can send the PDF (WhatsApp, email, etc.)
+    await Share.share({
+      url: result.uri,
+      title: filename,
+      text: 'Load development report'
+    });
+  } catch (err) {
+    console.error('Native PDF save failed, falling back to browser save:', err);
+
+
+    // Fallback: if something goes wrong, try the normal download behaviour
+    doc.save(filename);
+  }
+}
 
   // ---------- rifle / project loading ----------
 
@@ -878,13 +912,20 @@ exportProjectToPdf(): void {
       styles: { fontSize: 8 }
     });
 
-    const filename =
-      (project.name || 'load-development')
-        .toString()
-        .replace(/[^a-z0-9\-]+/gi, '_') + '.pdf';
+     const filename =
+  (project.name || 'load-development')
+    .toString()
+    .replace(/[^a-z0-9\-]+/gi, '_') + '.pdf';
 
-    doc.save(filename);
-  }
+if (Capacitor.isNativePlatform()) {
+  // Running inside the Android (or iOS) app
+  this.savePdfNative(doc, filename);  // async, but we don't need to await here
+} else {
+  // Normal browser build
+  doc.save(filename);
+}
+}
+
 
   cancelEntryForm(): void {
     this.entryFormVisible = false;

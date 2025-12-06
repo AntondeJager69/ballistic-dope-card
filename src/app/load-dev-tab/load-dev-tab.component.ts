@@ -76,102 +76,149 @@ startOcwWizard() {
 throw new Error('Method not implemented.');
 
 }
-  exportProjectToPdf(): void {
-    if (!this.selectedProject) {
-      return;
-    }
-
-    const project: any = this.selectedProject;
-    const rifle =
-      this.rifles && this.selectedRifleId
-        ? this.rifles.find((r: any) => r.id === this.selectedRifleId)
-        : null;
-
-    const doc = new jsPDF();
-
-    let y = 14;
-
-    // Title
-    doc.setFontSize(14);
-    doc.text('Load development', 14, y);
-    y += 8;
-
-    // Meta info
-    doc.setFontSize(10);
-    doc.text(`Rifle: ${rifle?.name || '—'}`, 14, y);
-    y += 5;
-
-    if (project.name) {
-      doc.text(`Load: ${project.name}`, 14, y);
-      y += 5;
-    }
-
-    if (project.type) {
-      const typeLabel =
-        project.type === 'ladder'
-          ? 'Ladder'
-          : project.type === 'ocw'
-          ? 'OCW'
-          : project.type;
-      doc.text(`Type: ${typeLabel}`, 14, y);
-      y += 5;
-    }
-
-    if (project.dateStarted) {
-      // shortDate(...) already exists in your component and is used in the HTML
-      const dateText = this.shortDate(project.dateStarted);
-      doc.text(`Started: ${dateText}`, 14, y);
-      y += 5;
-    }
-
-    y += 4;
-
-    // Build table rows from entriesForSelectedProject()
-    const entries = this.entriesForSelectedProject();
-    const rows = entries.map((entry: any) => {
-      const stats = this.statsForEntry(entry);
-      const avg = stats && stats.avg != null ? stats.avg.toFixed(0) : '—';
-      const es = stats && stats.es != null ? stats.es.toFixed(0) : '—';
-      const sd = stats && stats.sd != null ? stats.sd.toFixed(1) : '—';
-      const shots =
-        entry.shotsFired != null ? String(entry.shotsFired) : '—';
-
-      return [
-        String(entry.chargeGr ?? ''),
-        avg,
-        es,
-        sd,
-        shots,
-      ];
-    });
-
-    // Safety: if no rows, still produce a tiny PDF
-    if (!rows.length) {
-      doc.text('No velocity data captured yet.', 14, y);
-      doc.save(this.buildProjectFilename(project));
-      return;
-    }
-
-    // Table using jspdf-autotable
-    autoTable(doc, {
-      startY: y,
-      head: [['Charge (gr)', 'Avg fps', 'ES', 'SD', 'Shots']],
-      body: rows,
-      styles: {
-        fontSize: 8,
-      },
-      headStyles: {
-        fillColor: [34, 197, 94], // emerald-ish
-        textColor: [0, 0, 0],
-      },
-      alternateRowStyles: {
-        fillColor: [245, 245, 245],
-      },
-    });
-
-    // Save file
-    doc.save(this.buildProjectFilename(project));
+exportProjectToPdf(): void {
+  if (!this.selectedProject) {
+    return;
   }
+
+  const project: any = this.selectedProject;
+  const rifle =
+    this.rifles && this.selectedRifleId
+      ? this.rifles.find((r: any) => r.id === this.selectedRifleId)
+      : null;
+
+  const doc = new jsPDF();
+
+  let y = 14;
+
+  // Title
+  doc.setFontSize(14);
+  doc.text('Load development', 14, y);
+  y += 8;
+
+  // Meta info
+  doc.setFontSize(10);
+  doc.text(`Rifle: ${rifle?.name || '—'}`, 14, y);
+  y += 5;
+
+  if (project.name) {
+    doc.text(`Load: ${project.name}`, 14, y);
+    y += 5;
+  }
+
+  if (project.type) {
+    const typeLabel =
+      project.type === 'ladder'
+        ? 'Ladder'
+        : project.type === 'ocw'
+        ? 'OCW'
+        : project.type;
+    doc.text(`Type: ${typeLabel}`, 14, y);
+    y += 5;
+  }
+
+  if (project.dateStarted) {
+    // shortDate(...) already exists in your component and is used in the HTML
+    const dateText = this.shortDate(project.dateStarted);
+    doc.text(`Started: ${dateText}`, 14, y);
+    y += 5;
+  }
+
+  y += 4;
+
+  // Optional velocity vs charge chart using existing graphCoords
+  this.rebuildGraphData();
+  if (this.graphCoords && this.graphCoords.length) {
+    // Chart placement
+    const chartLeft = 14;
+    const chartTop = y;
+    const chartWidth = 180; // roughly full A4 width minus margins
+    const chartHeight = 50;
+
+    // Label
+    doc.setFontSize(10);
+    doc.text('Velocity vs charge', chartLeft, chartTop - 2);
+
+    // Border
+    doc.setDrawColor(200);
+    doc.rect(chartLeft, chartTop, chartWidth, chartHeight);
+
+    // Draw polyline based on graphCoords (x: 0..100, y: 0..60-like)
+    if (this.graphCoords.length > 1) {
+      doc.setDrawColor(34, 197, 94); // emerald line
+      for (let i = 1; i < this.graphCoords.length; i++) {
+        const prev = this.graphCoords[i - 1];
+        const curr = this.graphCoords[i];
+
+        const prevX = chartLeft + (prev.x / 100) * chartWidth;
+        const prevY = chartTop + (prev.y / 60) * chartHeight;
+
+        const currX = chartLeft + (curr.x / 100) * chartWidth;
+        const currY = chartTop + (curr.y / 60) * chartHeight;
+
+        doc.line(prevX, prevY, currX, currY);
+      }
+    }
+
+    // Draw nodes
+    doc.setFillColor(250, 204, 21); // yellow-ish nodes
+    for (const pt of this.graphCoords) {
+      const px = chartLeft + (pt.x / 100) * chartWidth;
+      const py = chartTop + (pt.y / 60) * chartHeight;
+      doc.circle(px, py, 1.2, 'F');
+    }
+
+    // Advance y below chart for the table
+    y = chartTop + chartHeight + 8;
+  }
+
+  // Build table rows from entriesForSelectedProject()
+  const entries = this.entriesForSelectedProject();
+  const rows = entries.map((entry: any) => {
+    const stats = this.statsForEntry(entry);
+    const avg = stats && stats.avg != null ? stats.avg.toFixed(0) : '—';
+    const es = stats && stats.es != null ? stats.es.toFixed(0) : '—';
+    const sd = stats && stats.sd != null ? stats.sd.toFixed(1) : '—';
+    const shots =
+      entry.shotsFired != null ? String(entry.shotsFired) : '—';
+
+    return [
+      String(entry.chargeGr ?? ''),
+      avg,
+      es,
+      sd,
+      shots,
+    ];
+  });
+
+  // Safety: if no rows, still produce a tiny PDF
+  if (!rows.length) {
+    doc.text('No velocity data captured yet.', 14, y);
+    doc.save(this.buildProjectFilename(project));
+    return;
+  }
+
+  // Table using jspdf-autotable
+  autoTable(doc, {
+    startY: y,
+    head: [['Charge (gr)', 'Avg fps', 'ES', 'SD', 'Shots']],
+    body: rows,
+    styles: {
+      fontSize: 8,
+    },
+    headStyles: {
+      fillColor: [34, 197, 94], // emerald-ish
+      textColor: [0, 0, 0],
+    },
+    alternateRowStyles: {
+      fillColor: [245, 245, 245],
+    },
+  });
+
+  // Save file
+  doc.save(this.buildProjectFilename(project));
+}
+
 
   // Rifles
   rifles: Rifle[] = [];
@@ -649,126 +696,164 @@ throw new Error('Method not implemented.');
    * User can then use "Save as PDF" in the browser print dialog.
    */
   exportSelectedProjectToPdf(): void {
-    if (!this.selectedProject) {
-      return;
+  if (!this.selectedProject) {
+    return;
+  }
+
+  const project: any = this.selectedProject;
+  const rifle =
+    this.rifles && this.selectedRifleId
+      ? this.rifles.find((r: any) => r.id === this.selectedRifleId)
+      : null;
+
+  const doc = new jsPDF('p', 'mm', 'a4');
+  let y = 14;
+
+  // ---- HEADER ----
+  doc.setFontSize(14);
+  doc.text(project.name || 'Load development', 14, y);
+  y += 8;
+
+  doc.setFontSize(10);
+  doc.text(`Rifle: ${rifle?.name || '—'}`, 14, y);
+  y += 5;
+
+  const typeLabel =
+    project.type === 'ladder'
+      ? 'Ladder'
+      : project.type === 'ocw'
+      ? 'OCW'
+      : (project.type || 'Unknown');
+
+  doc.text(`Type: ${typeLabel.toUpperCase()}`, 14, y);
+  y += 5;
+
+  if (project.dateStarted) {
+    const dateText = this.shortDate(project.dateStarted);
+    doc.text(`Date: ${dateText}`, 14, y);
+    y += 5;
+  }
+
+  y += 4;
+
+  // ---- ENTRIES + STATS ----
+  const entries: any[] = this.entriesForSelectedProject() || [];
+
+  if (!entries.length) {
+    doc.text('No velocity data captured yet.', 14, y);
+    const baseName =
+      (project.name || 'load-development').replace(/[^\w\d]+/g, '-').toLowerCase();
+    doc.save(`${baseName}.pdf`);
+    return;
+  }
+
+  const statsList = entries.map((e) => this.statsForEntry(e));
+
+  // Collect velocities for scaling
+  const velocities: number[] = [];
+  statsList.forEach((s: any) => {
+    if (s && typeof s.avg === 'number') {
+      velocities.push(s.avg);
+    }
+  });
+
+  // ---- CHART (Velocity vs charge) ----
+  if (velocities.length >= 2) {
+    const minV = Math.min(...velocities);
+    const maxV = Math.max(...velocities);
+    const rangeV = maxV - minV || 1;
+
+    const chartLeft = 14;
+    const chartTop = y;
+    const chartWidth = 180;
+    const chartHeight = 50;
+
+    doc.setFontSize(10);
+    doc.text('Velocity vs charge', chartLeft, chartTop - 2);
+
+    // Chart frame
+    doc.setDrawColor(200);
+    doc.rect(chartLeft, chartTop, chartWidth, chartHeight);
+
+    // Polyline
+    doc.setDrawColor(34, 197, 94); // emerald-ish
+    const lastIndex = entries.length - 1;
+
+    for (let i = 1; i < entries.length; i++) {
+      const prevStats = statsList[i - 1];
+      const currStats = statsList[i];
+      if (!prevStats || prevStats.avg == null || !currStats || currStats.avg == null) {
+        continue;
+      }
+
+      const prevNorm = (prevStats.avg - minV) / rangeV;
+      const currNorm = (currStats.avg - minV) / rangeV;
+
+      const prevX =
+        chartLeft + (lastIndex ? (i - 1) / lastIndex : 0) * chartWidth;
+      const currX =
+        chartLeft + (lastIndex ? i / lastIndex : 0) * chartWidth;
+
+      const prevY = chartTop + chartHeight - prevNorm * chartHeight;
+      const currY = chartTop + chartHeight - currNorm * chartHeight;
+
+      doc.line(prevX, prevY, currX, currY);
     }
 
-    const project: any = this.selectedProject as any;
-    const entries = this.entriesForSelectedProject();
-
-    // Open a new window
-    const win = window.open('', '_blank', 'width=800,height=600');
-    if (!win) {
-      alert('Popup blocked. Please allow popups to export to PDF.');
-      return;
-    }
-
-    const safe = (v: any) =>
-      v === null || v === undefined ? '' : String(v);
-
-    const title =
-      safe(project.name) || 'Load development';
-
-    // Build a simple HTML document with a table
-    let rowsHtml = '';
-    entries.forEach((entry: any, index: number) => {
-      const stats = this.statsForEntry(entry);
-      const avg = stats ? stats.avg : '';
-      const shots = entry.shotsFired ?? '';
-
-      rowsHtml += `
-        <tr>
-          <td>${index + 1}</td>
-          <td>${safe(entry.chargeGr)}</td>
-          <td>${safe(avg)}</td>
-          <td>${safe(shots)}</td>
-        </tr>
-      `;
+    // Nodes
+    doc.setFillColor(250, 204, 21); // yellow-ish
+    entries.forEach((entry: any, idx: number) => {
+      const s = statsList[idx];
+      if (!s || s.avg == null) {
+        return;
+      }
+      const norm = (s.avg - minV) / rangeV;
+      const x =
+        chartLeft + (lastIndex ? idx / lastIndex : 0) * chartWidth;
+      const yPt = chartTop + chartHeight - norm * chartHeight;
+      doc.circle(x, yPt, 1.2, 'F');
     });
 
-    const html = `
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${title}</title>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      margin: 16px;
-      color: #111827;
-    }
-    h1 {
-      font-size: 20px;
-      margin: 0 0 4px 0;
-    }
-    .meta {
-      font-size: 12px;
-      color: #4b5563;
-      margin-bottom: 2px;
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 12px;
-      font-size: 12px;
-    }
-    th, td {
-      border: 1px solid #d1d5db;
-      padding: 4px 6px;
-      text-align: left;
-    }
-    th {
-      background: #e5e7eb;
-    }
-  </style>
-</head>
-<body>
-  <h1>${title}</h1>
-  ${
-    project.dateStarted
-      ? `<div class="meta">Date: ${safe(project.dateStarted)}</div>`
-      : ''
-  }
-  ${
-    project.type
-      ? `<div class="meta">Type: ${safe(project.type).toUpperCase()}</div>`
-      : ''
-  }
-  ${
-    project.powder || project.bullet
-      ? `<div class="meta">Load: ${safe(project.bulletWeightGr)}gr ${safe(
-          project.bullet
-        )} · ${safe(project.powder)}</div>`
-      : ''
+    y = chartTop + chartHeight + 8; // move below chart
   }
 
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Charge (gr)</th>
-        <th>Velocity (avg)</th>
-        <th>Shots</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rowsHtml}
-    </tbody>
-  </table>
-</body>
-</html>
-    `;
+  // ---- TABLE ----
+  const rows = entries.map((entry: any, idx: number) => {
+    const stats = statsList[idx];
+    const avg = stats && stats.avg != null ? stats.avg.toFixed(0) : '—';
+    const es = stats && stats.es != null ? stats.es.toFixed(0) : '—';
+    const sd = stats && stats.sd != null ? stats.sd.toFixed(1) : '—';
+    const shots =
+      entry.shotsFired != null ? String(entry.shotsFired) : '—';
 
-    win.document.open();
-    win.document.write(html);
-    win.document.close();
+    return [
+      String(entry.chargeGr ?? ''),
+      avg,
+      es,
+      sd,
+      shots,
+    ];
+  });
 
-    // Give the browser a tick to render, then open print dialog
-    setTimeout(() => {
-      win.print();
-    }, 200);
-  }
+  autoTable(doc, {
+    startY: y,
+    head: [['Charge (gr)', 'Avg fps', 'ES', 'SD', 'Shots']],
+    body: rows,
+    styles: { fontSize: 8 },
+    headStyles: {
+      fillColor: [34, 197, 94],
+      textColor: [0, 0, 0],
+    },
+    alternateRowStyles: {
+      fillColor: [245, 245, 245],
+    },
+  });
+
+  const fileBase =
+    (project.name || 'load-development').replace(/[^\w\d]+/g, '-').toLowerCase();
+  doc.save(`${fileBase}.pdf`);
+}
+
 
   // ---------- entries ----------
 

@@ -76,6 +76,7 @@ startOcwWizard() {
 throw new Error('Method not implemented.');
 
 }
+
 exportProjectToPdf(): void {
   if (!this.selectedProject) {
     return;
@@ -695,43 +696,48 @@ exportProjectToPdf(): void {
    * Export the currently selected project's table to a printable page.
    * User can then use "Save as PDF" in the browser print dialog.
    */
+  
   exportSelectedProjectToPdf(): void {
     if (!this.selectedProject) {
+      alert('Select a load development first.');
       return;
     }
 
-    const project: any = this.selectedProject as any;
+    const project: any = this.selectedProject;
     const rifle =
       this.rifles && this.selectedRifleId
-        ? this.rifles.find((r: any) => r.id === this.selectedRifleId)
+        ? this.rifles.find(r => r.id === this.selectedRifleId)
         : null;
 
     const entries: any[] = this.entriesForSelectedProject() || [];
+    if (!entries.length) {
+      alert('No entries to export yet.');
+      return;
+    }
+
     const statsList = entries.map(e => this.statsForEntry(e));
+
     const velocities: number[] = [];
-    statsList.forEach((s: any) => {
+    const charges: number[] = [];
+
+    statsList.forEach((s: any, idx) => {
       if (s && typeof s.avg === 'number') {
         velocities.push(s.avg);
+        const ch = entries[idx].chargeGr;
+        if (typeof ch === 'number') {
+          charges.push(ch);
+        } else {
+          charges.push(NaN);
+        }
       }
     });
 
-    // Optional node / OCW-style highlights (ladder only currently)
-    let nodeIndexByEntryId = new Map<number, number>();
-    if (typeof (this as any).computeNodesForSelectedProject === 'function') {
-      nodeIndexByEntryId = (this as any).computeNodesForSelectedProject();
-    }
-    const nodeIndexByRow: number[] = entries.map((entry: any) =>
-      nodeIndexByEntryId.get(entry.id) ?? -1
-    );
-
-    // Create PDF
     const doc = new jsPDF('p', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // --- Branding bar at the top ---
-    const brandBarHeight = 10;
+    // -------- BRAND BAR --------
     doc.setFillColor(0, 0, 0);
-    doc.rect(0, 0, pageWidth, brandBarHeight, 'F');
+    doc.rect(0, 0, pageWidth, 10, 'F');
 
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(11);
@@ -739,16 +745,13 @@ exportProjectToPdf(): void {
     doc.setFontSize(8);
     doc.text('Ballistics', 8, 9);
 
-    (doc as any).setFontSize(9);
-    (doc as any).text('Load development report', pageWidth - 8, 6, {
-      align: 'right'
-    });
+    doc.setFontSize(9);
+    doc.text('Load development report', pageWidth - 8, 6);
 
-    // Reset for body
     doc.setTextColor(0, 0, 0);
-    let y = brandBarHeight + 8;
+    let y = 18;
 
-    // --- Header/meta section ---
+    // -------- META --------
     doc.setFontSize(13);
     doc.text(project.name || 'Load development', 14, y);
     y += 7;
@@ -757,229 +760,130 @@ exportProjectToPdf(): void {
     doc.text(`Rifle: ${rifle?.name || '—'}`, 14, y);
     y += 5;
 
-    const typeLabel =
-      project.type === 'ladder'
-        ? 'Ladder'
-        : project.type === 'ocw'
-        ? 'OCW'
-        : (project.type || 'Unknown');
-    doc.text(`Type: ${typeLabel.toUpperCase()}`, 14, y);
-    y += 5;
-
-    if (project.dateStarted) {
-      const dateText = this.shortDate(project.dateStarted);
-      doc.text(`Date: ${dateText}`, 14, y);
+    if (project.type) {
+      doc.text(`Type: ${(project.type as string).toUpperCase()}`, 14, y);
       y += 5;
     }
 
-    y += 4;
+    if (project.dateStarted) {
+      doc.text(`Date: ${this.shortDate(project.dateStarted)}`, 14, y);
+      y += 6;
+    }
 
-    // --- Chart: Velocity vs charge ---
-    if (velocities.length >= 2) {
+    y += 2;
+
+    // -------- MAIN VELOCITY CHART --------
+    if (velocities.length >= 2 && charges.length === velocities.length) {
       const minV = Math.min(...velocities);
       const maxV = Math.max(...velocities);
       const rangeV = maxV - minV || 1;
 
       const chartLeft = 18;
-      const chartWidth = pageWidth - chartLeft * 2;
+      const chartWidth = pageWidth - 36;
       const chartTop = y;
       const chartHeight = 55;
 
-      doc.setFontSize(10);
-      doc.text('Velocity vs charge', chartLeft, chartTop - 2);
-
-      // Border / axes box
+      // Border
       doc.setDrawColor(200);
       doc.rect(chartLeft, chartTop, chartWidth, chartHeight);
 
-      const lastIndex = entries.length - 1;
+      // Title
+      doc.setFontSize(10);
+      doc.text('Velocity vs charge', chartLeft, chartTop - 3);
 
-      // Polyline for avg velocity
+      const n = velocities.length;
+      const xStep = n > 1 ? chartWidth / (n - 1) : 0;
+
+      // Velocity line
       doc.setDrawColor(34, 197, 94);
-      for (let i = 1; i < entries.length; i++) {
-        const prevStats = statsList[i - 1];
-        const currStats = statsList[i];
-        if (!prevStats || prevStats.avg == null || !currStats || currStats.avg == null) {
-          continue;
-        }
+      for (let i = 1; i < n; i++) {
+        const prevV = velocities[i - 1];
+        const currV = velocities[i];
+        const prevX = chartLeft + (i - 1) * xStep;
+        const currX = chartLeft + i * xStep;
 
-        const prevNorm = (prevStats.avg - minV) / rangeV;
-        const currNorm = (currStats.avg - minV) / rangeV;
-
-        const prevX =
-          chartLeft + (lastIndex ? (i - 1) / lastIndex : 0) * chartWidth;
-        const currX =
-          chartLeft + (lastIndex ? i / lastIndex : 0) * chartWidth;
-
-        const prevY = chartTop + chartHeight - prevNorm * chartHeight;
-        const currY = chartTop + chartHeight - currNorm * chartHeight;
+        const prevY =
+          chartTop + chartHeight - ((prevV - minV) / rangeV) * chartHeight;
+        const currY =
+          chartTop + chartHeight - ((currV - minV) / rangeV) * chartHeight;
 
         doc.line(prevX, prevY, currX, currY);
       }
 
-      // Nodes with OCW / ladder node highlighting
-      for (let idx = 0; idx < entries.length; idx++) {
-        const s: any = statsList[idx];
-        if (!s || s.avg == null) {
-          continue;
+      // Points + labels
+      doc.setFontSize(7);
+      for (let i = 0; i < n; i++) {
+        const v = velocities[i];
+        const charge = charges[i];
+        const x = chartLeft + i * xStep;
+        const yVal =
+          chartTop + chartHeight - ((v - minV) / rangeV) * chartHeight;
+
+        // Point
+        doc.setFillColor(250, 204, 21);
+        doc.circle(x, yVal, 1.5, 'F');
+
+        // Charge under axis
+        if (!Number.isNaN(charge)) {
+          const chargeText = charge.toFixed(1);
+          doc.text(
+            chargeText,
+            x - doc.getTextWidth(chargeText) / 2,
+            chartTop + chartHeight + 4
+          );
         }
-        const nodeIdx = nodeIndexByRow[idx];
 
-        let fill: [number, number, number];
-        if (nodeIdx === 0) {
-          // Primary node – bright green
-          fill = [0, 255, 0];
-        } else if (nodeIdx === 1) {
-          // Next warmer – orange
-          fill = [255, 153, 0];
-        } else if (nodeIdx === 2) {
-          // Third band – red
-          fill = [255, 0, 0];
-        } else {
-          // Normal charge
-          fill = [250, 204, 21]; // yellow-ish
-        }
-
-        const norm = (s.avg - minV) / rangeV;
-        const x =
-          chartLeft + (lastIndex ? idx / lastIndex : 0) * chartWidth;
-        const yPt = chartTop + chartHeight - norm * chartHeight;
-
-        doc.setFillColor(fill[0], fill[1], fill[2]);
-        doc.circle(x, yPt, 1.4, 'F');
+        // Velocity above point
+        const vText = String(Math.round(v));
+        doc.text(vText, x - doc.getTextWidth(vText) / 2, yVal - 2);
       }
 
-      // Axis labels
+      // Simple axis labels (no rotation)
       doc.setFontSize(8);
-      doc.setTextColor(90, 90, 90);
-
-      // X axis label
+      const xLabel = 'Charge (gr)';
       doc.text(
-        'Charge (gr)',
-        chartLeft + chartWidth / 2,
-        chartTop + chartHeight + 6,
-        { align: 'center' } as any
+        xLabel,
+        chartLeft + chartWidth / 2 - doc.getTextWidth(xLabel) / 2,
+        chartTop + chartHeight + 10
       );
 
-      // Y axis label rotated
-      (doc as any).text('Velocity (fps)', chartLeft - 6, chartTop + chartHeight / 2, {
-        angle: 90,
-        align: 'center'
-      });
+      const yLabel = 'Velocity (fps)';
+      doc.text(yLabel, chartLeft, chartTop - 6);
 
-      // Min / max velocity markers on Y axis
-      doc.setTextColor(120, 120, 120);
-      doc.text(
-        String(Math.round(minV)),
-        chartLeft - 2,
-        chartTop + chartHeight,
-        { align: 'right' } as any
-      );
-      doc.text(
-        String(Math.round(maxV)),
-        chartLeft - 2,
-        chartTop + 3,
-        { align: 'right' } as any
-      );
-
-      // restore default text colour for body
-      doc.setTextColor(0, 0, 0);
-
-      y = chartTop + chartHeight + 12;
+      y = chartTop + chartHeight + 16;
     }
 
-    // --- Table rows ---
-    const rows = entries.map((entry: any, idx: number) => {
+    // -------- TABLE --------
+    const tableBody = entries.map((entry: any, idx: number) => {
       const stats = statsList[idx];
-      const avg = stats && stats.avg != null ? stats.avg.toFixed(0) : '—';
-      const es = stats && stats.es != null ? stats.es.toFixed(0) : '—';
-      const sd = stats && stats.sd != null ? stats.sd.toFixed(1) : '—';
-      const shots =
-        entry.shotsFired != null ? String(entry.shotsFired) : '—';
+      const avg = stats?.avg ?? '';
+      const es = stats?.es ?? '';
+      const sd = stats?.sd ?? '';
+      const shots = entry.shotsFired ?? '';
 
       return [
-        String(entry.chargeGr ?? ''),
-        avg,
+        idx + 1,
+        entry.chargeGr ?? '',
+        avg ? Math.round(avg) : '',
         es,
         sd,
         shots
       ];
     });
 
-    if (!rows.length) {
-      doc.text('No velocity data captured yet.', 14, y);
-      doc.save(this.buildProjectFilename(project));
-      return;
-    }
-
     autoTable(doc, {
       startY: y,
-      head: [['Charge (gr)', 'Avg fps', 'ES', 'SD', 'Shots']],
-      body: rows,
-      styles: {
-        fontSize: 8
-      },
-      headStyles: {
-        fillColor: [34, 197, 94],
-        textColor: [0, 0, 0]
-      },
-      alternateRowStyles: {
-        fillColor: [245, 245, 245]
-      },
-      // Use same node detection to tint table rows
-      didParseCell: (data: any) => {
-        if (data.section === 'body') {
-          const nodeIdx = nodeIndexByRow[data.row.index];
-          if (nodeIdx === 0) {
-            data.cell.styles.fillColor = [218, 255, 218]; // light green
-          } else if (nodeIdx === 1) {
-            data.cell.styles.fillColor = [255, 239, 213]; // light orange
-          } else if (nodeIdx === 2) {
-            data.cell.styles.fillColor = [255, 218, 218]; // light red
-          }
-        }
-      }
+      head: [['#', 'Charge (gr)', 'Avg (fps)', 'ES', 'SD', 'Shots']],
+      body: tableBody,
+      styles: { fontSize: 8 }
     });
 
-    doc.save(this.buildProjectFilename(project));
-  }
+    const filename =
+      (project.name || 'load-development')
+        .toString()
+        .replace(/[^a-z0-9\-]+/gi, '_') + '.pdf';
 
-
-  // ---------- entries ----------
-
-  newEntry(): void {
-    if (!this.selectedProject) {
-      alert('Select project first');
-      return;
-    }
-    this.editingEntry = null;
-    this.entryFormVisible = true;
-    this.entryForm = this.createEmptyEntryForm();
-  }
-
-  editEntry(entry: LoadDevEntry): void {
-    this.editingEntry = entry;
-    this.entryFormVisible = true;
-
-    const any = entry as any;
-
-    this.entryForm = {
-      loadLabel: entry.loadLabel || '',
-      powder: entry.powder || '',
-      chargeGr: entry.chargeGr ?? null,
-      coal: entry.coal || '',
-      primer: entry.primer || '',
-      bullet: entry.bullet || '',
-      bulletWeightGr: entry.bulletWeightGr ?? null,
-      bulletBc: entry.bulletBc || '',
-      distanceM: entry.distanceM ?? null,
-      shotsFired: entry.shotsFired ?? null,
-      groupSize: entry.groupSize ?? null,
-      groupUnit: entry.groupUnit ?? 'MOA',
-      velocityInput: any.velocityInput || '',
-      poiNote: entry.poiNote || '',
-      notes: entry.notes || ''
-    };
+    doc.save(filename);
   }
 
   cancelEntryForm(): void {

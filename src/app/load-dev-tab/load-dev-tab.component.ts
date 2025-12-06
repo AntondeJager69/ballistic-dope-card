@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../data.service';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   Rifle,
   LoadDevProject,
@@ -72,7 +74,105 @@ interface NodeEntry {
 export class LoadDevTabComponent implements OnInit {
 startOcwWizard() {
 throw new Error('Method not implemented.');
+
 }
+  exportProjectToPdf(): void {
+    if (!this.selectedProject) {
+      return;
+    }
+
+    const project: any = this.selectedProject;
+    const rifle =
+      this.rifles && this.selectedRifleId
+        ? this.rifles.find((r: any) => r.id === this.selectedRifleId)
+        : null;
+
+    const doc = new jsPDF();
+
+    let y = 14;
+
+    // Title
+    doc.setFontSize(14);
+    doc.text('Load development', 14, y);
+    y += 8;
+
+    // Meta info
+    doc.setFontSize(10);
+    doc.text(`Rifle: ${rifle?.name || '—'}`, 14, y);
+    y += 5;
+
+    if (project.name) {
+      doc.text(`Load: ${project.name}`, 14, y);
+      y += 5;
+    }
+
+    if (project.type) {
+      const typeLabel =
+        project.type === 'ladder'
+          ? 'Ladder'
+          : project.type === 'ocw'
+          ? 'OCW'
+          : project.type;
+      doc.text(`Type: ${typeLabel}`, 14, y);
+      y += 5;
+    }
+
+    if (project.dateStarted) {
+      // shortDate(...) already exists in your component and is used in the HTML
+      const dateText = this.shortDate(project.dateStarted);
+      doc.text(`Started: ${dateText}`, 14, y);
+      y += 5;
+    }
+
+    y += 4;
+
+    // Build table rows from entriesForSelectedProject()
+    const entries = this.entriesForSelectedProject();
+    const rows = entries.map((entry: any) => {
+      const stats = this.statsForEntry(entry);
+      const avg = stats && stats.avg != null ? stats.avg.toFixed(0) : '—';
+      const es = stats && stats.es != null ? stats.es.toFixed(0) : '—';
+      const sd = stats && stats.sd != null ? stats.sd.toFixed(1) : '—';
+      const shots =
+        entry.shotsFired != null ? String(entry.shotsFired) : '—';
+
+      return [
+        String(entry.chargeGr ?? ''),
+        avg,
+        es,
+        sd,
+        shots,
+      ];
+    });
+
+    // Safety: if no rows, still produce a tiny PDF
+    if (!rows.length) {
+      doc.text('No velocity data captured yet.', 14, y);
+      doc.save(this.buildProjectFilename(project));
+      return;
+    }
+
+    // Table using jspdf-autotable
+    autoTable(doc, {
+      startY: y,
+      head: [['Charge (gr)', 'Avg fps', 'ES', 'SD', 'Shots']],
+      body: rows,
+      styles: {
+        fontSize: 8,
+      },
+      headStyles: {
+        fillColor: [34, 197, 94], // emerald-ish
+        textColor: [0, 0, 0],
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245],
+      },
+    });
+
+    // Save file
+    doc.save(this.buildProjectFilename(project));
+  }
+
   // Rifles
   rifles: Rifle[] = [];
   selectedRifleId: number | null = null;
@@ -151,6 +251,11 @@ throw new Error('Method not implemented.');
       oal: null,
       distanceM: null
     };
+  }
+  private buildProjectFilename(project: any): string {
+    const base = (project?.name || 'load-development').toString();
+    const safe = base.replace(/[^\w\d\-]+/g, '_');
+    return safe + '.pdf';
   }
 
   private createEmptyEntryForm(): EntryForm {
@@ -538,6 +643,131 @@ throw new Error('Method not implemented.');
       this.selectedProjectId = null;
     }
     this.loadProjects();
+  }
+  /**
+   * Export the currently selected project's table to a printable page.
+   * User can then use "Save as PDF" in the browser print dialog.
+   */
+  exportSelectedProjectToPdf(): void {
+    if (!this.selectedProject) {
+      return;
+    }
+
+    const project: any = this.selectedProject as any;
+    const entries = this.entriesForSelectedProject();
+
+    // Open a new window
+    const win = window.open('', '_blank', 'width=800,height=600');
+    if (!win) {
+      alert('Popup blocked. Please allow popups to export to PDF.');
+      return;
+    }
+
+    const safe = (v: any) =>
+      v === null || v === undefined ? '' : String(v);
+
+    const title =
+      safe(project.name) || 'Load development';
+
+    // Build a simple HTML document with a table
+    let rowsHtml = '';
+    entries.forEach((entry: any, index: number) => {
+      const stats = this.statsForEntry(entry);
+      const avg = stats ? stats.avg : '';
+      const shots = entry.shotsFired ?? '';
+
+      rowsHtml += `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${safe(entry.chargeGr)}</td>
+          <td>${safe(avg)}</td>
+          <td>${safe(shots)}</td>
+        </tr>
+      `;
+    });
+
+    const html = `
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 16px;
+      color: #111827;
+    }
+    h1 {
+      font-size: 20px;
+      margin: 0 0 4px 0;
+    }
+    .meta {
+      font-size: 12px;
+      color: #4b5563;
+      margin-bottom: 2px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 12px;
+      font-size: 12px;
+    }
+    th, td {
+      border: 1px solid #d1d5db;
+      padding: 4px 6px;
+      text-align: left;
+    }
+    th {
+      background: #e5e7eb;
+    }
+  </style>
+</head>
+<body>
+  <h1>${title}</h1>
+  ${
+    project.dateStarted
+      ? `<div class="meta">Date: ${safe(project.dateStarted)}</div>`
+      : ''
+  }
+  ${
+    project.type
+      ? `<div class="meta">Type: ${safe(project.type).toUpperCase()}</div>`
+      : ''
+  }
+  ${
+    project.powder || project.bullet
+      ? `<div class="meta">Load: ${safe(project.bulletWeightGr)}gr ${safe(
+          project.bullet
+        )} · ${safe(project.powder)}</div>`
+      : ''
+  }
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Charge (gr)</th>
+        <th>Velocity (avg)</th>
+        <th>Shots</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>
+</body>
+</html>
+    `;
+
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+
+    // Give the browser a tick to render, then open print dialog
+    setTimeout(() => {
+      win.print();
+    }, 200);
   }
 
   // ---------- entries ----------

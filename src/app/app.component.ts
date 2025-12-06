@@ -50,6 +50,11 @@ export class AppComponent implements OnInit {
   activeVenueName: string | null = null;
   recentSessionsCount = 0;
   recentLoadDevCount = 0;
+onBackFromWindEffect(): void {
+  // Close the full-screen wind tool and go back to the normal menu
+  this.selectedTool = null;
+  this.currentTab = 'menu';
+}
 
   showReportsForm = false;
   reportRequest: ReportRequest = {

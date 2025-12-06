@@ -696,163 +696,253 @@ exportProjectToPdf(): void {
    * User can then use "Save as PDF" in the browser print dialog.
    */
   exportSelectedProjectToPdf(): void {
-  if (!this.selectedProject) {
-    return;
-  }
-
-  const project: any = this.selectedProject;
-  const rifle =
-    this.rifles && this.selectedRifleId
-      ? this.rifles.find((r: any) => r.id === this.selectedRifleId)
-      : null;
-
-  const doc = new jsPDF('p', 'mm', 'a4');
-  let y = 14;
-
-  // ---- HEADER ----
-  doc.setFontSize(14);
-  doc.text(project.name || 'Load development', 14, y);
-  y += 8;
-
-  doc.setFontSize(10);
-  doc.text(`Rifle: ${rifle?.name || '—'}`, 14, y);
-  y += 5;
-
-  const typeLabel =
-    project.type === 'ladder'
-      ? 'Ladder'
-      : project.type === 'ocw'
-      ? 'OCW'
-      : (project.type || 'Unknown');
-
-  doc.text(`Type: ${typeLabel.toUpperCase()}`, 14, y);
-  y += 5;
-
-  if (project.dateStarted) {
-    const dateText = this.shortDate(project.dateStarted);
-    doc.text(`Date: ${dateText}`, 14, y);
-    y += 5;
-  }
-
-  y += 4;
-
-  // ---- ENTRIES + STATS ----
-  const entries: any[] = this.entriesForSelectedProject() || [];
-
-  if (!entries.length) {
-    doc.text('No velocity data captured yet.', 14, y);
-    const baseName =
-      (project.name || 'load-development').replace(/[^\w\d]+/g, '-').toLowerCase();
-    doc.save(`${baseName}.pdf`);
-    return;
-  }
-
-  const statsList = entries.map((e) => this.statsForEntry(e));
-
-  // Collect velocities for scaling
-  const velocities: number[] = [];
-  statsList.forEach((s: any) => {
-    if (s && typeof s.avg === 'number') {
-      velocities.push(s.avg);
-    }
-  });
-
-  // ---- CHART (Velocity vs charge) ----
-  if (velocities.length >= 2) {
-    const minV = Math.min(...velocities);
-    const maxV = Math.max(...velocities);
-    const rangeV = maxV - minV || 1;
-
-    const chartLeft = 14;
-    const chartTop = y;
-    const chartWidth = 180;
-    const chartHeight = 50;
-
-    doc.setFontSize(10);
-    doc.text('Velocity vs charge', chartLeft, chartTop - 2);
-
-    // Chart frame
-    doc.setDrawColor(200);
-    doc.rect(chartLeft, chartTop, chartWidth, chartHeight);
-
-    // Polyline
-    doc.setDrawColor(34, 197, 94); // emerald-ish
-    const lastIndex = entries.length - 1;
-
-    for (let i = 1; i < entries.length; i++) {
-      const prevStats = statsList[i - 1];
-      const currStats = statsList[i];
-      if (!prevStats || prevStats.avg == null || !currStats || currStats.avg == null) {
-        continue;
-      }
-
-      const prevNorm = (prevStats.avg - minV) / rangeV;
-      const currNorm = (currStats.avg - minV) / rangeV;
-
-      const prevX =
-        chartLeft + (lastIndex ? (i - 1) / lastIndex : 0) * chartWidth;
-      const currX =
-        chartLeft + (lastIndex ? i / lastIndex : 0) * chartWidth;
-
-      const prevY = chartTop + chartHeight - prevNorm * chartHeight;
-      const currY = chartTop + chartHeight - currNorm * chartHeight;
-
-      doc.line(prevX, prevY, currX, currY);
+    if (!this.selectedProject) {
+      return;
     }
 
-    // Nodes
-    doc.setFillColor(250, 204, 21); // yellow-ish
-    entries.forEach((entry: any, idx: number) => {
-      const s = statsList[idx];
-      if (!s || s.avg == null) {
-        return;
+    const project: any = this.selectedProject as any;
+    const rifle =
+      this.rifles && this.selectedRifleId
+        ? this.rifles.find((r: any) => r.id === this.selectedRifleId)
+        : null;
+
+    const entries: any[] = this.entriesForSelectedProject() || [];
+    const statsList = entries.map(e => this.statsForEntry(e));
+    const velocities: number[] = [];
+    statsList.forEach((s: any) => {
+      if (s && typeof s.avg === 'number') {
+        velocities.push(s.avg);
       }
-      const norm = (s.avg - minV) / rangeV;
-      const x =
-        chartLeft + (lastIndex ? idx / lastIndex : 0) * chartWidth;
-      const yPt = chartTop + chartHeight - norm * chartHeight;
-      doc.circle(x, yPt, 1.2, 'F');
     });
 
-    y = chartTop + chartHeight + 8; // move below chart
+    // Optional node / OCW-style highlights (ladder only currently)
+    let nodeIndexByEntryId = new Map<number, number>();
+    if (typeof (this as any).computeNodesForSelectedProject === 'function') {
+      nodeIndexByEntryId = (this as any).computeNodesForSelectedProject();
+    }
+    const nodeIndexByRow: number[] = entries.map((entry: any) =>
+      nodeIndexByEntryId.get(entry.id) ?? -1
+    );
+
+    // Create PDF
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // --- Branding bar at the top ---
+    const brandBarHeight = 10;
+    doc.setFillColor(0, 0, 0);
+    doc.rect(0, 0, pageWidth, brandBarHeight, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11);
+    doc.text('GUNSTUFF', 8, 6);
+    doc.setFontSize(8);
+    doc.text('Ballistics', 8, 9);
+
+    (doc as any).setFontSize(9);
+    (doc as any).text('Load development report', pageWidth - 8, 6, {
+      align: 'right'
+    });
+
+    // Reset for body
+    doc.setTextColor(0, 0, 0);
+    let y = brandBarHeight + 8;
+
+    // --- Header/meta section ---
+    doc.setFontSize(13);
+    doc.text(project.name || 'Load development', 14, y);
+    y += 7;
+
+    doc.setFontSize(10);
+    doc.text(`Rifle: ${rifle?.name || '—'}`, 14, y);
+    y += 5;
+
+    const typeLabel =
+      project.type === 'ladder'
+        ? 'Ladder'
+        : project.type === 'ocw'
+        ? 'OCW'
+        : (project.type || 'Unknown');
+    doc.text(`Type: ${typeLabel.toUpperCase()}`, 14, y);
+    y += 5;
+
+    if (project.dateStarted) {
+      const dateText = this.shortDate(project.dateStarted);
+      doc.text(`Date: ${dateText}`, 14, y);
+      y += 5;
+    }
+
+    y += 4;
+
+    // --- Chart: Velocity vs charge ---
+    if (velocities.length >= 2) {
+      const minV = Math.min(...velocities);
+      const maxV = Math.max(...velocities);
+      const rangeV = maxV - minV || 1;
+
+      const chartLeft = 18;
+      const chartWidth = pageWidth - chartLeft * 2;
+      const chartTop = y;
+      const chartHeight = 55;
+
+      doc.setFontSize(10);
+      doc.text('Velocity vs charge', chartLeft, chartTop - 2);
+
+      // Border / axes box
+      doc.setDrawColor(200);
+      doc.rect(chartLeft, chartTop, chartWidth, chartHeight);
+
+      const lastIndex = entries.length - 1;
+
+      // Polyline for avg velocity
+      doc.setDrawColor(34, 197, 94);
+      for (let i = 1; i < entries.length; i++) {
+        const prevStats = statsList[i - 1];
+        const currStats = statsList[i];
+        if (!prevStats || prevStats.avg == null || !currStats || currStats.avg == null) {
+          continue;
+        }
+
+        const prevNorm = (prevStats.avg - minV) / rangeV;
+        const currNorm = (currStats.avg - minV) / rangeV;
+
+        const prevX =
+          chartLeft + (lastIndex ? (i - 1) / lastIndex : 0) * chartWidth;
+        const currX =
+          chartLeft + (lastIndex ? i / lastIndex : 0) * chartWidth;
+
+        const prevY = chartTop + chartHeight - prevNorm * chartHeight;
+        const currY = chartTop + chartHeight - currNorm * chartHeight;
+
+        doc.line(prevX, prevY, currX, currY);
+      }
+
+      // Nodes with OCW / ladder node highlighting
+      for (let idx = 0; idx < entries.length; idx++) {
+        const s: any = statsList[idx];
+        if (!s || s.avg == null) {
+          continue;
+        }
+        const nodeIdx = nodeIndexByRow[idx];
+
+        let fill: [number, number, number];
+        if (nodeIdx === 0) {
+          // Primary node – bright green
+          fill = [0, 255, 0];
+        } else if (nodeIdx === 1) {
+          // Next warmer – orange
+          fill = [255, 153, 0];
+        } else if (nodeIdx === 2) {
+          // Third band – red
+          fill = [255, 0, 0];
+        } else {
+          // Normal charge
+          fill = [250, 204, 21]; // yellow-ish
+        }
+
+        const norm = (s.avg - minV) / rangeV;
+        const x =
+          chartLeft + (lastIndex ? idx / lastIndex : 0) * chartWidth;
+        const yPt = chartTop + chartHeight - norm * chartHeight;
+
+        doc.setFillColor(fill[0], fill[1], fill[2]);
+        doc.circle(x, yPt, 1.4, 'F');
+      }
+
+      // Axis labels
+      doc.setFontSize(8);
+      doc.setTextColor(90, 90, 90);
+
+      // X axis label
+      doc.text(
+        'Charge (gr)',
+        chartLeft + chartWidth / 2,
+        chartTop + chartHeight + 6,
+        { align: 'center' } as any
+      );
+
+      // Y axis label rotated
+      (doc as any).text('Velocity (fps)', chartLeft - 6, chartTop + chartHeight / 2, {
+        angle: 90,
+        align: 'center'
+      });
+
+      // Min / max velocity markers on Y axis
+      doc.setTextColor(120, 120, 120);
+      doc.text(
+        String(Math.round(minV)),
+        chartLeft - 2,
+        chartTop + chartHeight,
+        { align: 'right' } as any
+      );
+      doc.text(
+        String(Math.round(maxV)),
+        chartLeft - 2,
+        chartTop + 3,
+        { align: 'right' } as any
+      );
+
+      // restore default text colour for body
+      doc.setTextColor(0, 0, 0);
+
+      y = chartTop + chartHeight + 12;
+    }
+
+    // --- Table rows ---
+    const rows = entries.map((entry: any, idx: number) => {
+      const stats = statsList[idx];
+      const avg = stats && stats.avg != null ? stats.avg.toFixed(0) : '—';
+      const es = stats && stats.es != null ? stats.es.toFixed(0) : '—';
+      const sd = stats && stats.sd != null ? stats.sd.toFixed(1) : '—';
+      const shots =
+        entry.shotsFired != null ? String(entry.shotsFired) : '—';
+
+      return [
+        String(entry.chargeGr ?? ''),
+        avg,
+        es,
+        sd,
+        shots
+      ];
+    });
+
+    if (!rows.length) {
+      doc.text('No velocity data captured yet.', 14, y);
+      doc.save(this.buildProjectFilename(project));
+      return;
+    }
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Charge (gr)', 'Avg fps', 'ES', 'SD', 'Shots']],
+      body: rows,
+      styles: {
+        fontSize: 8
+      },
+      headStyles: {
+        fillColor: [34, 197, 94],
+        textColor: [0, 0, 0]
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245]
+      },
+      // Use same node detection to tint table rows
+      didParseCell: (data: any) => {
+        if (data.section === 'body') {
+          const nodeIdx = nodeIndexByRow[data.row.index];
+          if (nodeIdx === 0) {
+            data.cell.styles.fillColor = [218, 255, 218]; // light green
+          } else if (nodeIdx === 1) {
+            data.cell.styles.fillColor = [255, 239, 213]; // light orange
+          } else if (nodeIdx === 2) {
+            data.cell.styles.fillColor = [255, 218, 218]; // light red
+          }
+        }
+      }
+    });
+
+    doc.save(this.buildProjectFilename(project));
   }
-
-  // ---- TABLE ----
-  const rows = entries.map((entry: any, idx: number) => {
-    const stats = statsList[idx];
-    const avg = stats && stats.avg != null ? stats.avg.toFixed(0) : '—';
-    const es = stats && stats.es != null ? stats.es.toFixed(0) : '—';
-    const sd = stats && stats.sd != null ? stats.sd.toFixed(1) : '—';
-    const shots =
-      entry.shotsFired != null ? String(entry.shotsFired) : '—';
-
-    return [
-      String(entry.chargeGr ?? ''),
-      avg,
-      es,
-      sd,
-      shots,
-    ];
-  });
-
-  autoTable(doc, {
-    startY: y,
-    head: [['Charge (gr)', 'Avg fps', 'ES', 'SD', 'Shots']],
-    body: rows,
-    styles: { fontSize: 8 },
-    headStyles: {
-      fillColor: [34, 197, 94],
-      textColor: [0, 0, 0],
-    },
-    alternateRowStyles: {
-      fillColor: [245, 245, 245],
-    },
-  });
-
-  const fileBase =
-    (project.name || 'load-development').replace(/[^\w\d]+/g, '-').toLowerCase();
-  doc.save(`${fileBase}.pdf`);
-}
 
 
   // ---------- entries ----------
